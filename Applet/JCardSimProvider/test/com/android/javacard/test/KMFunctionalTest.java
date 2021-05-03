@@ -16,29 +16,8 @@
 
 package com.android.javacard.test;
 
-import com.android.javacard.keymaster.KMArray;
-import com.android.javacard.keymaster.KMBoolTag;
-import com.android.javacard.keymaster.KMByteBlob;
-import com.android.javacard.keymaster.KMByteTag;
-import com.android.javacard.keymaster.KMJCardSimApplet;
-import com.android.javacard.keymaster.KMJCardSimulator;
-import com.android.javacard.keymaster.KMSEProvider;
-import com.android.javacard.keymaster.KMDecoder;
-import com.android.javacard.keymaster.KMEncoder;
-import com.android.javacard.keymaster.KMEnum;
-import com.android.javacard.keymaster.KMEnumArrayTag;
-import com.android.javacard.keymaster.KMEnumTag;
-import com.android.javacard.keymaster.KMError;
-import com.android.javacard.keymaster.KMHardwareAuthToken;
-import com.android.javacard.keymaster.KMHmacSharingParameters;
-import com.android.javacard.keymaster.KMInteger;
-import com.android.javacard.keymaster.KMIntegerTag;
-import com.android.javacard.keymaster.KMKeyCharacteristics;
-import com.android.javacard.keymaster.KMKeyParameters;
-import com.android.javacard.keymaster.KMKeymasterApplet;
-import com.android.javacard.keymaster.KMRepository;
-import com.android.javacard.keymaster.KMType;
-import com.android.javacard.keymaster.KMVerificationToken;
+import com.android.javacard.keymaster.*;
+import com.android.javacard.keymaster.KMBaseRepository;
 import com.licel.jcardsim.smartcardio.CardSimulator;
 import com.licel.jcardsim.utils.AIDUtil;
 
@@ -926,7 +905,7 @@ public class KMFunctionalTest {
     init();
     byte[] hmacKey = new byte[32];
     cryptoProvider.newRandomNumber(hmacKey, (short) 0, (short) 32);
-    KMRepository.instance().initComputedHmac(hmacKey, (short) 0, (short) 32);
+    KMBaseRepository.instance().initComputedHmac(hmacKey, (short) 0, (short) 32);
     // generate aes key with unlocked_device_required
     short aesKey = generateAesDesKey(KMType.AES, (short) 128, null, null, true);
     short keyBlobPtr = KMArray.cast(aesKey).get((short) 1);
@@ -1009,9 +988,9 @@ public class KMFunctionalTest {
     // hmac the data
 /*    HMACKey key =
       cryptoProvider.createHMACKey(
-        KMRepository.instance().getComputedHmacKey(),
+        KMBaseRepository.instance().getComputedHmacKey(),
         (short) 0,
-        (short) KMRepository.instance().getComputedHmacKey().length);
+        (short) KMBaseRepository.instance().getComputedHmacKey().length);
 
  */
     byte[] mac = new byte[32];
@@ -1021,7 +1000,7 @@ public class KMFunctionalTest {
         mac,
         (short)0);
      */
-    short key = KMRepository.instance().getComputedHmacKey();
+    short key = KMBaseRepository.instance().getComputedHmacKey();
     cryptoProvider.hmacSign(
         KMByteBlob.cast(key).getBuffer(),
         KMByteBlob.cast(key).getStartOff(),
@@ -1078,9 +1057,9 @@ public class KMFunctionalTest {
     // hmac the data
    /* HMACKey key =
       cryptoProvider.createHMACKey(
-        KMRepository.instance().getComputedHmacKey(),
+        KMBaseRepository.instance().getComputedHmacKey(),
         (short) 0,
-        (short) KMRepository.instance().getComputedHmacKey().length);
+        (short) KMBaseRepository.instance().getComputedHmacKey().length);
 
     */
     ptr = KMVerificationToken.cast(verToken).getMac();
@@ -1090,7 +1069,7 @@ public class KMFunctionalTest {
         mac,
         (short)0);
      */
-    short key = KMRepository.instance().getComputedHmacKey();
+    short key = KMBaseRepository.instance().getComputedHmacKey();
     cryptoProvider.hmacSign(KMByteBlob.cast(key).getBuffer(),
         KMByteBlob.cast(key).getStartOff(),
         KMByteBlob.cast(key).length(),
@@ -1787,7 +1766,7 @@ public class KMFunctionalTest {
     Util.arrayCopyNonAtomic(output, (short) 0, encTransportKey, (short) 0,
         outlen);
     //Clean the heap.
-    KMRepository.instance().clean();
+    KMBaseRepository.instance().clean();
     short tagCount = 7;
     short arrPtr = KMArray.instance(tagCount);
     short boolTag = KMBoolTag.instance(KMType.NO_AUTH_REQUIRED);
@@ -2422,7 +2401,7 @@ public class KMFunctionalTest {
         KMKeyParameters.instance(params), (short) 0, false);
     // Get the operation handle.
     short opHandle = KMArray.cast(ret).get((short) 2);
-    byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+    byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
     KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0,
         (short) opHandleBuf.length);
     opHandle = KMInteger.uint_64(opHandleBuf, (short) 0);
@@ -2446,7 +2425,7 @@ public class KMFunctionalTest {
         KMKeyParameters.instance(params), (short) 0, false);
     // Get the operation handle.
     short opHandle = KMArray.cast(ret).get((short) 2);
-    byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+    byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
     KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0,
         (short) opHandleBuf.length);
     opHandle = KMInteger.uint_64(opHandleBuf, (short) 0);
@@ -2518,7 +2497,7 @@ public class KMFunctionalTest {
         KMKeyParameters.instance(desPkcs7Params), (short) 0, false);
     // Get the operation handle.
     short opHandle = KMArray.cast(ret).get((short) 2);
-    byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+    byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
     KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0,
         (short) opHandleBuf.length);
     opHandle = KMInteger.uint_64(opHandleBuf, (short) 0);
@@ -2590,7 +2569,7 @@ public class KMFunctionalTest {
 
       // Get the operation handle.
       short opHandle = KMArray.cast(ret).get((short) 2);
-      byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+      byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
       KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0,
           (short) opHandleBuf.length);
       opHandle = KMInteger.uint_64(opHandleBuf, (short) 0);
@@ -2835,7 +2814,7 @@ public class KMFunctionalTest {
       ret = begin(KMType.SIGN, keyBlobPtr, KMKeyParameters.instance(inParams), (short) 0, resetEvents[i][0]);
       // Get the operation handle.
       short opHandle = KMArray.cast(ret).get((short) 2);
-      byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+      byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
       KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0, (short) opHandleBuf.length);
       //Get the keyblobptr again.
       keyBlobPtr = KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length);
@@ -2846,7 +2825,7 @@ public class KMFunctionalTest {
       ret = begin(KMType.SIGN, keyBlobPtr, KMKeyParameters.instance(inParams), (short) 0, resetEvents[i][1]);
       // Get the operation handle.
       short opHandle1 = KMArray.cast(ret).get((short) 2);
-      byte[] opHandleBuf1 = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+      byte[] opHandleBuf1 = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
       KMInteger.cast(opHandle1).getValue(opHandleBuf1, (short) 0, (short) opHandleBuf1.length);
       //Get the keyblobptr again.
       keyBlobPtr = KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length);
@@ -2909,7 +2888,7 @@ public class KMFunctionalTest {
         Assert.assertEquals(KMError.INVALID_OPERATION_HANDLE, err);
       }
       //Call finish end----------------
-      KMRepository.instance().clean();
+      KMBaseRepository.instance().clean();
     }
   }
 
@@ -3001,7 +2980,7 @@ public class KMFunctionalTest {
         KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length),
         KMKeyParameters.instance(inParams), (short) 0, false);
     short opHandle = KMArray.cast(ret).get((short) 2);
-    byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+    byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
     KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0, (short) opHandleBuf.length);
     opHandle = KMInteger.uint_64(opHandleBuf, (short) 0);
     ret = abort(opHandle, false);
@@ -3300,7 +3279,7 @@ public class KMFunctionalTest {
       boolean aesGcmFlag) {
     short beginResp = begin(keyPurpose, keyBlob, inParams, hwToken, false);
     short opHandle = KMArray.cast(beginResp).get((short) 2);
-    byte[] opHandleBuf = new byte[KMRepository.OPERATION_HANDLE_SIZE];
+    byte[] opHandleBuf = new byte[KMBaseRepository.OPERATION_HANDLE_SIZE];
     KMInteger.cast(opHandle).getValue(opHandleBuf, (short) 0, (short) opHandleBuf.length);
     short dataPtr = KMByteBlob.instance(data, (short) 0, (short) data.length);
     short ret = KMType.INVALID_VALUE;

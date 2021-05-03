@@ -25,7 +25,7 @@ import javacard.framework.Util;
  * retained if applet is upgraded. There will be four operation state records maintained i.e. only
  * four active operations are supported at any given time.
  */
-public class KMOperationState {
+public class KMOperationState implements KMBaseOperationState {
 
   public static final byte MAX_DATA = 20;
   private static final byte OPERATION = 0;

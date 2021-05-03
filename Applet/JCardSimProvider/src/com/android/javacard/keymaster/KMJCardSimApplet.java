@@ -32,4 +32,7 @@ public class KMJCardSimApplet extends KMKeymasterApplet {
     new KMJCardSimApplet().register();
   }
 
+  @Override
+  public KMBaseRepository getRepositoryInstance() { return new KMRepository(false); }
+
 }

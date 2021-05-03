@@ -31,7 +31,7 @@ import javacardx.apdu.ExtendedLength;
  * objects. It also implements the keymaster state machine and handles javacard applet life cycle
  * events.
  */
-public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLength {
+public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLength, KMConfiguration {
 
   // Constants.
   public static final byte AES_BLOCK_SIZE = 16;
@@ -182,7 +182,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   protected static byte keymasterState = ILLEGAL_STATE;
   protected static KMEncoder encoder;
   protected static KMDecoder decoder;
-  protected static KMRepository repository;
+  protected static KMBaseRepository repository;
   protected static KMSEProvider seProvider;
   protected static Object[] bufferRef;
   protected static short[] bufferProp;
@@ -196,7 +196,8 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   protected KMKeymasterApplet(KMSEProvider seImpl) {
     seProvider = seImpl;
     boolean isUpgrading = seImpl.isUpgrading();
-    repository = new KMRepository(isUpgrading);
+    //TODO Fix it properly
+    repository = getRepositoryInstance();//new KMRepositoryUsingRam(isUpgrading);
     initializeTransientArrays();
     if (!isUpgrading) {
       keymasterState = KMKeymasterApplet.INIT_STATE;
@@ -523,7 +524,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
 
   private void freeOperations() {
     if (data[OP_HANDLE] != KMType.INVALID_VALUE) {
-      KMOperationState op = repository.findOperation(data[OP_HANDLE]);
+      KMBaseOperationState op = repository.findOperation(data[OP_HANDLE]);
       if (op != null) {
         repository.releaseOperation(op);
       }
@@ -881,7 +882,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
 
     tmpVariables[0] = KMArray.cast(args).get((short) 0);
     if (tmpVariables[0] != KMType.INVALID_VALUE
-        && KMByteBlob.cast(tmpVariables[0]).length() != KMRepository.SHARED_SECRET_KEY_SIZE) {
+        && KMByteBlob.cast(tmpVariables[0]).length() != KMBaseRepository.SHARED_SECRET_KEY_SIZE) {
       KMException.throwIt(KMError.INVALID_ARGUMENT);
     }
     // Persist shared Hmac.
@@ -918,21 +919,21 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   private byte mapToAttId(short attTag) {
     switch (attTag) {
       case KMType.ATTESTATION_ID_BRAND:
-        return KMRepository.ATT_ID_BRAND;
+        return KMBaseRepository.ATT_ID_BRAND;
       case KMType.ATTESTATION_ID_DEVICE:
-        return KMRepository.ATT_ID_DEVICE;
+        return KMBaseRepository.ATT_ID_DEVICE;
       case KMType.ATTESTATION_ID_IMEI:
-        return KMRepository.ATT_ID_IMEI;
+        return KMBaseRepository.ATT_ID_IMEI;
       case KMType.ATTESTATION_ID_MANUFACTURER:
-        return KMRepository.ATT_ID_MANUFACTURER;
+        return KMBaseRepository.ATT_ID_MANUFACTURER;
       case KMType.ATTESTATION_ID_MEID:
-        return KMRepository.ATT_ID_MEID;
+        return KMBaseRepository.ATT_ID_MEID;
       case KMType.ATTESTATION_ID_MODEL:
-        return KMRepository.ATT_ID_MODEL;
+        return KMBaseRepository.ATT_ID_MODEL;
       case KMType.ATTESTATION_ID_PRODUCT:
-        return KMRepository.ATT_ID_PRODUCT;
+        return KMBaseRepository.ATT_ID_PRODUCT;
       case KMType.ATTESTATION_ID_SERIAL:
-        return KMRepository.ATT_ID_SERIAL;
+        return KMBaseRepository.ATT_ID_SERIAL;
     }
     KMException.throwIt(KMError.INVALID_TAG);
     return (byte) 0xFF; // should never happen
@@ -1611,7 +1612,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     repository.reclaimMemory(bufferProp[BUF_LEN_OFFSET]);
 
     data[OP_HANDLE] = KMArray.cast(tmpVariables[2]).get((short) 0);
-    KMOperationState op = repository.findOperation(data[OP_HANDLE]);
+    KMBaseOperationState op = repository.findOperation(data[OP_HANDLE]);
     if (op == null) {
       KMException.throwIt(KMError.INVALID_OPERATION_HANDLE);
     }
@@ -1645,7 +1646,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     data[HW_TOKEN] = KMArray.cast(tmpVariables[2]).get((short) 4);
     data[VERIFICATION_TOKEN] = KMArray.cast(tmpVariables[2]).get((short) 5);
     // Check Operation Handle
-    KMOperationState op = repository.findOperation(data[OP_HANDLE]);
+    KMBaseOperationState op = repository.findOperation(data[OP_HANDLE]);
     if (op == null) {
       KMException.throwIt(KMError.INVALID_OPERATION_HANDLE);
     }
@@ -1682,7 +1683,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     sendOutgoing(apdu);
   }
 
-  private void finishEncryptOperation(KMOperationState op, byte[] scratchPad) {
+  private void finishEncryptOperation(KMBaseOperationState op, byte[] scratchPad) {
     short len = KMByteBlob.cast(data[INPUT_DATA]).length();
     switch (op.getAlgorithm()) {
       case KMType.AES:
@@ -1728,7 +1729,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void finishDecryptOperation(KMOperationState op, byte[] scratchPad) {
+  private void finishDecryptOperation(KMBaseOperationState op, byte[] scratchPad) {
     short len = KMByteBlob.cast(data[INPUT_DATA]).length();
     switch (op.getAlgorithm()) {
       case KMType.RSA:
@@ -1789,7 +1790,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
 
   // update operation should send 0x00 for finish variable, where as finish operation
   // should send 0x01 for finish variable.
-  private void updateAAD(KMOperationState op, byte finish) {
+  private void updateAAD(KMBaseOperationState op, byte finish) {
     // Is input data absent
     if (data[INPUT_DATA] == KMType.INVALID_VALUE) {
       KMException.throwIt(KMError.INVALID_ARGUMENT);
@@ -1821,7 +1822,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void finishSigningVerifyingOperation(KMOperationState op, byte[] scratchPad) {
+  private void finishSigningVerifyingOperation(KMBaseOperationState op, byte[] scratchPad) {
     Util.arrayFillNonAtomic(scratchPad, (short) 0, (short) 256, (byte) 0);
     switch (op.getAlgorithm()) {
       case KMType.RSA:
@@ -1911,7 +1912,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void authorizeUpdateFinishOperation(KMOperationState op, byte[] scratchPad) {
+  private void authorizeUpdateFinishOperation(KMBaseOperationState op, byte[] scratchPad) {
     // If one time user Authentication is required
     if (op.isSecureUserIdReqd() && !op.isAuthTimeoutValidated()) {
       validateVerificationToken(op, data[VERIFICATION_TOKEN], scratchPad);
@@ -1966,7 +1967,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void validateVerificationToken(KMOperationState op, short verToken, byte[] scratchPad) {
+  private void validateVerificationToken(KMBaseOperationState op, short verToken, byte[] scratchPad) {
     // CBOR Encoding is always big endian and Java is big endian
     short ptr = KMVerificationToken.cast(verToken).getMac();
     // If mac length is zero then token is empty.
@@ -2063,7 +2064,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
     // Check Operation Handle and get op state
     // Check Operation Handle
-    KMOperationState op = repository.findOperation(data[OP_HANDLE]);
+    KMBaseOperationState op = repository.findOperation(data[OP_HANDLE]);
     if (op == null) {
       KMException.throwIt(KMError.INVALID_OPERATION_HANDLE);
     }
@@ -2204,7 +2205,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     tmpVariables[0] = KMEnum.cast(tmpVariables[0]).getVal();
     data[HW_TOKEN] = KMArray.cast(args).get((short) 3);
     /*Generate a random number for operation handle */
-    short buf = KMByteBlob.instance(KMRepository.OPERATION_HANDLE_SIZE);
+    short buf = KMByteBlob.instance(KMBaseRepository.OPERATION_HANDLE_SIZE);
     generateUniqueOperationHandle(
         KMByteBlob.cast(buf).getBuffer(),
         KMByteBlob.cast(buf).getStartOff(),
@@ -2214,7 +2215,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
         KMByteBlob.cast(buf).getBuffer(),
         KMByteBlob.cast(buf).getStartOff(),
         KMByteBlob.cast(buf).length());
-    KMOperationState op = repository.reserveOperation(opHandle);
+    KMBaseOperationState op = repository.reserveOperation(opHandle);
     if (op == null) {
       KMException.throwIt(KMError.TOO_MANY_OPERATIONS);
     }
@@ -2270,7 +2271,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     sendOutgoing(apdu);
   }
 
-  private void authorizeAlgorithm(KMOperationState op) {
+  private void authorizeAlgorithm(KMBaseOperationState op) {
     short alg = KMEnumTag.getValue(KMType.ALGORITHM, data[HW_PARAMETERS]);
     if (alg == KMType.INVALID_VALUE) {
       KMException.throwIt(KMError.UNSUPPORTED_ALGORITHM);
@@ -2278,7 +2279,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     op.setAlgorithm((byte) alg);
   }
 
-  private void authorizePurpose(KMOperationState op) {
+  private void authorizePurpose(KMBaseOperationState op) {
     switch (op.getAlgorithm()) {
       case KMType.AES:
       case KMType.DES:
@@ -2300,7 +2301,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void authorizeDigest(KMOperationState op) {
+  private void authorizeDigest(KMBaseOperationState op) {
     short digests =
         KMKeyParameters.findTag(KMType.ENUM_ARRAY_TAG, KMType.DIGEST, data[HW_PARAMETERS]);
     op.setDigest(KMType.DIGEST_NONE);
@@ -2342,7 +2343,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void authorizePadding(KMOperationState op) {
+  private void authorizePadding(KMBaseOperationState op) {
     short paddings =
         KMKeyParameters.findTag(KMType.ENUM_ARRAY_TAG, KMType.PADDING, data[HW_PARAMETERS]);
     op.setPadding(KMType.PADDING_NONE);
@@ -2395,7 +2396,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void authorizeBlockModeAndMacLength(KMOperationState op) {
+  private void authorizeBlockModeAndMacLength(KMBaseOperationState op) {
     short param =
         KMKeyParameters.findTag(KMType.ENUM_ARRAY_TAG, KMType.BLOCK_MODE, data[KEY_PARAMETERS]);
     if (param != KMType.INVALID_VALUE) {
@@ -2484,7 +2485,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     op.setBlockMode((byte) param);
   }
 
-  private void authorizeAndBeginOperation(KMOperationState op, byte[] scratchPad) {
+  private void authorizeAndBeginOperation(KMBaseOperationState op, byte[] scratchPad) {
     authorizeAlgorithm(op);
     authorizePurpose(op);
     authorizeDigest(op);
@@ -2552,7 +2553,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void beginCipherOperation(KMOperationState op) {
+  private void beginCipherOperation(KMBaseOperationState op) {
     switch (op.getAlgorithm()) {
       case KMType.RSA:
         try {
@@ -2606,7 +2607,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void beginSignVerifyOperation(KMOperationState op) {
+  private void beginSignVerifyOperation(KMBaseOperationState op) {
     switch (op.getAlgorithm()) {
       case KMType.RSA:
         try {
@@ -2690,7 +2691,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     }
   }
 
-  private void authorizeUserSecureIdAuthTimeout(KMOperationState op) {
+  private void authorizeUserSecureIdAuthTimeout(KMBaseOperationState op) {
     short authTime;
     // Authorize User Secure Id and Auth timeout
     tmpVariables[0] =
@@ -3259,8 +3260,8 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     repository.releaseAllOperations();
 
     // Hmac is cleared, so generate a new Hmac nonce.
-    seProvider.newRandomNumber(scratchPad, (short) 0, KMRepository.HMAC_SEED_NONCE_SIZE);
-    repository.initHmacNonce(scratchPad, (short) 0, KMRepository.HMAC_SEED_NONCE_SIZE);
+    seProvider.newRandomNumber(scratchPad, (short) 0, KMBaseRepository.HMAC_SEED_NONCE_SIZE);
+    repository.initHmacNonce(scratchPad, (short) 0, KMBaseRepository.HMAC_SEED_NONCE_SIZE);
   }
 
   private static void processGenerateKey(APDU apdu) {
@@ -3924,4 +3925,10 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
       index--;
     }
   }
+
+  @Override
+  public KMBaseRepository getRepositoryInstance() { return null; }
+
+  @Override
+  public KMOperation getOperationInstance() { return null; }
 }

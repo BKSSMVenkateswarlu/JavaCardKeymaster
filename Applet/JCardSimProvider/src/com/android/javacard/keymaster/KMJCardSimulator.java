@@ -1088,7 +1088,7 @@ public class KMJCardSimulator implements KMSEProvider {
   // 8 byte rngCounter and 16 byte block size.
   @Override
   public void newRandomNumber(byte[] num, short startOff, short length) {
-    KMRepository repository = KMRepository.instance();
+    KMBaseRepository repository = KMBaseRepository.instance();
     byte[] bufPtr = repository.getHeap();
     short countBufInd = repository.alloc(KMKeymasterApplet.AES_BLOCK_SIZE);
     short randBufInd = repository.alloc(KMKeymasterApplet.AES_BLOCK_SIZE);
