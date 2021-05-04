@@ -44,6 +44,8 @@ public abstract class KMType {
   public static final byte VERIFICATION_TOKEN_TYPE = 0x09;
   public static final byte HMAC_SHARING_PARAM_TYPE = 0x0A;
   public static final byte X509_CERT = 0x0B;
+  public static final byte MAP_TYPE = 0x0C;
+  public static final byte COSE_KEY_TYPE = 0x0D;
   // Tag Types
   public static final short INVALID_TAG = 0x0000;
   public static final short ENUM_TAG = 0x1000;
@@ -293,11 +295,13 @@ public abstract class KMType {
   public static final byte KM_KEY_CHARACTERISTICS_OFFSET = KM_TYPE_BASE_OFFSET + 12;
   public static final byte KM_KEY_PARAMETERS_OFFSET = KM_TYPE_BASE_OFFSET + 13;
   public static final byte KM_VERIFICATION_TOKEN_OFFSET = KM_TYPE_BASE_OFFSET + 14;
+  public static final byte KM_MAP_OFFSET = KM_TYPE_BASE_OFFSET + 15;
+  public static final byte KM_COSE_KEY_OFFSET = KM_TYPE_BASE_OFFSET + 16;
 
   protected static KMRepository repository;
   protected static byte[] heap;
   // Instance table
-  public static final byte INSTANCE_TABLE_SIZE = 15;
+  public static final byte INSTANCE_TABLE_SIZE = 17;
   protected static short[] instanceTable;
 
   public static void initialize() {
