@@ -30,7 +30,7 @@ public class KMInteger extends KMType {
   public static final short UINT_64 = 8;
   private static KMInteger prototype;
 
-  private KMInteger() {
+  protected KMInteger() {
   }
 
   private static KMInteger proto(short ptr) {
@@ -114,7 +114,7 @@ public class KMInteger extends KMType {
 
   // Get the length of the integer
   public short length() {
-    return Util.getShort(heap, (short) (instanceTable[KM_INTEGER_OFFSET] + 1));
+    return Util.getShort(heap, (short) (getBaseOffset() + 1));
   }
 
   // Get the buffer pointer in which blob is contained.
@@ -124,7 +124,7 @@ public class KMInteger extends KMType {
 
   // Get the start of value
   public short getStartOff() {
-    return (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE);
+    return (short) (getBaseOffset() + TLV_HEADER_SIZE);
   }
 
   public void getValue(byte[] dest, short destOff, short length) {
@@ -135,28 +135,28 @@ public class KMInteger extends KMType {
       length = length();
       destOff += length;
     }
-    Util.arrayCopyNonAtomic(heap, (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE), dest, destOff, length);
+    Util.arrayCopyNonAtomic(heap, (short) (getBaseOffset() + TLV_HEADER_SIZE), dest, destOff, length);
   }
 
   public void setValue(byte[] src, short srcOff) {
-    Util.arrayCopyNonAtomic(src, srcOff, heap, (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE), length());
+    Util.arrayCopyNonAtomic(src, srcOff, heap, (short) (getBaseOffset() + TLV_HEADER_SIZE), length());
   }
 
   public short value(byte[] dest, short destOff) {
-    Util.arrayCopyNonAtomic(heap, (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE), dest, destOff, length());
+    Util.arrayCopyNonAtomic(heap, (short) (getBaseOffset() + TLV_HEADER_SIZE), dest, destOff, length());
     return length();
   }
 
   public short getShort() {
-    return Util.getShort(heap, (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE + 2));
+    return Util.getShort(heap, (short) (getBaseOffset() + TLV_HEADER_SIZE + 2));
   }
 
   public short getSignificantShort() {
-    return Util.getShort(heap, (short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE));
+    return Util.getShort(heap, (short) (getBaseOffset() + TLV_HEADER_SIZE));
   }
 
   public byte getByte() {
-    return heap[(short) (instanceTable[KM_INTEGER_OFFSET] + TLV_HEADER_SIZE + 3)];
+    return heap[(short) (getBaseOffset() + TLV_HEADER_SIZE + 3)];
   }
 
   public boolean isZero() {
@@ -199,5 +199,9 @@ public class KMInteger extends KMType {
       }
     }
     return 0;
+  }
+
+  protected short getBaseOffset() {
+    return instanceTable[KM_INTEGER_OFFSET];
   }
 }

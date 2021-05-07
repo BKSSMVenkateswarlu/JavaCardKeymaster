@@ -105,6 +105,11 @@ public class KMDecoder {
         return decodeHmacSharingParam(exp);
       case KMType.HW_AUTH_TOKEN_TYPE:
         return decodeHwAuthToken(exp);
+      case KMType.COSE_KEY_TYPE:
+        return decodeCoseKey(exp);
+      case KMType.COSE_KEY_TAG_TYPE:
+        short tagValueType = KMCoseKeyTypeValue.getTagValueType(exp);
+        return decodeCoseKeyTag(tagValueType, exp);
       case KMType.TAG_TYPE:
         short tagType = KMTag.getTagType(exp);
         return decodeTag(tagType, exp);
@@ -155,6 +160,66 @@ public class KMDecoder {
   private short decodeKeyChar(short exp) {
     short vals = decode(KMKeyCharacteristics.cast(exp).getVals());
     return KMKeyCharacteristics.instance(vals);
+  }
+
+  private short decodeCoseKeyIntegerValue(short exp) {
+    //TODO
+    return (short) 0;
+  }
+
+  private short decodeCoseKeyNegIntegerValue(short exp) {
+    //TODO
+    return (short) 0;
+  }
+
+  private short decodeCoseKeyByteBlobValue(short exp) {
+    //TODO
+    return (short) 0;
+  }
+
+
+  private short decodeCoseKeyTag(short tagValueType, short exp) {
+    switch (tagValueType) {
+      case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
+        return decodeCoseKeyByteBlobValue(exp);
+      case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
+        return decodeCoseKeyNegIntegerValue(exp);
+      case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
+        return decodeCoseKeyIntegerValue(exp);
+      default:
+        ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+        return 0;
+    }
+  }
+
+  private short decodeCoseKey(short exp) {
+    /*short payloadLength = readMajorTypeWithPayloadLength(MAP_TYPE);
+    // get allowed key pairs
+    short allowedKeyPairs = KMCoseKey.cast(exp).getVals();
+    short vals = KMMap.instance(payloadLength);
+    short length = KMMap.cast(allowedKeyPairs).length();
+    short index = 0;
+    boolean tagFound = false;
+    short tagInd;
+
+    // For each tag in payload ...
+    while (index < payloadLength) {
+      tagFound = false;
+      tagInd = 0;
+      // Read cose key and cose value
+      // Check against the allowed tags ...
+      while (tagInd < length) {
+      }
+      tagInd++;
+    }
+    if (!tagFound) {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    } else {
+      index++;
+    }
+    return KMCoseKey.instance(vals);*/
+    //TODO
+    return (short) 0;
   }
 
   private short decodeKeyParam(short exp) {
@@ -255,7 +320,7 @@ public class KMDecoder {
 
   private short decodeEnumTag(short exp) {
     readTagKey(KMEnumTag.cast(exp).getTagType());
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     // Enum Tag value will always be integer with max 1 byte length.
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
@@ -282,7 +347,7 @@ public class KMDecoder {
 
   private short decodeBoolTag(short exp) {
     readTagKey(KMBoolTag.cast(exp).getTagType());
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     // BOOL Tag is a leaf node and it must always have tiny encoded uint value = 1.
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
@@ -296,7 +361,7 @@ public class KMDecoder {
   }
 
   private short decodeEnum(short exp) {
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     // Enum value will always be integer with max 1 byte length.
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
@@ -324,7 +389,7 @@ public class KMDecoder {
   private short decodeInteger(short exp) {
     short inst;
     short startOff = scratchBuf[START_OFFSET];
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
@@ -356,13 +421,13 @@ public class KMDecoder {
 
   private short decodeByteBlob(short exp) {
     short payloadLength = readMajorTypeWithPayloadLength(BYTES_TYPE);
-    short inst = KMByteBlob.instance((byte[])bufferRef[0], scratchBuf[START_OFFSET], payloadLength);
+    short inst = KMByteBlob.instance((byte[]) bufferRef[0], scratchBuf[START_OFFSET], payloadLength);
     incrementStartOff(payloadLength);
     return inst;
   }
 
   private short peekTagType() {
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
@@ -377,7 +442,7 @@ public class KMDecoder {
   }
 
   private void readTagKey(short expectedTagType) {
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE) {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
@@ -415,7 +480,7 @@ public class KMDecoder {
   }
 
   private short readShort() {
-    byte[] buffer = (byte[])bufferRef[0];
+    byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     short val = Util.makeShort(buffer[startOff], buffer[(short) (startOff + 1)]);
     incrementStartOff((short) 2);
@@ -424,7 +489,7 @@ public class KMDecoder {
 
   private byte readByte() {
     short startOff = scratchBuf[START_OFFSET];
-    byte val = ((byte[])bufferRef[0])[startOff];
+    byte val = ((byte[]) bufferRef[0])[startOff];
     incrementStartOff((short) 1);
     return val;
   }
@@ -437,7 +502,7 @@ public class KMDecoder {
   }
 
   public short readCertificateChainLengthAndHeaderLen(byte[] buf, short bufOffset,
-      short bufLen) {
+                                                      short bufLen) {
     bufferRef[0] = buf;
     scratchBuf[START_OFFSET] = bufOffset;
     scratchBuf[LEN_OFFSET] = (short) (bufOffset + bufLen);

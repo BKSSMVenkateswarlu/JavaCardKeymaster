@@ -6,15 +6,6 @@ import javacard.framework.Util;
 
 public class KMCoseKey extends KMType {
 
-  public static final byte COSE_KEY_KEY_TYPE = 1;
-  public static final byte COSE_KEY_KEY_ID = 2;
-  public static final byte COSE_KEY_ALGORITHM = 3;
-  public static final byte COSE_KEY_KEY_OPS = 4;
-  public static final byte COSE_KEY_CURVE = -1;
-  public static final byte COSE_KEY_PUBKEY_X = -2;
-  public static final byte COSE_KEY_PUBKEY_Y = -3;
-  public static final byte COSE_KEY_PRIV_KEY = -4;
-
   private static KMCoseKey prototype;
 
   private KMCoseKey() {
@@ -29,12 +20,14 @@ public class KMCoseKey extends KMType {
   }
 
   public static short exp() {
-    short mapPtr = KMMap.instance((short) 8);
-    KMMap map = KMMap.cast(mapPtr);
-    map.add((short) 0, KMInteger.exp(), KMInteger.exp());
-    map.add((short) 1, KMInteger.exp(), KMByteBlob.exp());
-    return instance(mapPtr);
+    short arrPtr = KMArray.instance((short) 3);
+    KMArray arr = KMArray.cast(arrPtr);
+    arr.add((short) 0, KMCoseKeyIntegerValue.exp());
+    arr.add((short) 1, KMCoseKeyNIntegerValue.exp());
+    arr.add((short) 2, KMCoseKeyByteBlobValue.exp());
+    return KMCoseKey.instance(arrPtr);
   }
+
 
   public static short instance(short vals) {
     short ptr = KMType.instance(COSE_KEY_TYPE, (short) 2);
@@ -47,7 +40,7 @@ public class KMCoseKey extends KMType {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     short arrPtr = Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE));
-    if (heap[arrPtr] != MAP_TYPE) {
+    if (heap[arrPtr] != ARRAY_TYPE) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     return proto(ptr);
@@ -58,8 +51,8 @@ public class KMCoseKey extends KMType {
   }
 
   public short length() {
-    short mapPtr = getVals();
-    return KMMap.cast(mapPtr).length();
+    short arrPtr = getVals();
+    return KMArray.cast(arrPtr).length();
   }
 
 }

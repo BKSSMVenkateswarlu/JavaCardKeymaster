@@ -1,5 +1,7 @@
 package com.android.javacard.keymaster;
 
+import javacard.framework.Util;
+
 public class KMCose {
   //COSE SIGN1
   public static final byte COSE_SIGN1_ENTRY_COUNT = 4;
@@ -36,7 +38,6 @@ public class KMCose {
   public static final byte COSE_ECCURVE_256 = 1;
 
   //COSE key types
-  public static final byte COSE_KEY_TYPE_OCTET_KEY_PAIR = 1;
   public static final byte COSE_KEY_TYPE_EC2 = 2;
   public static final byte COSE_KEY_TYPE_SYMMETRIC_KEY = 4;
 
@@ -51,6 +52,48 @@ public class KMCose {
   public static final short AES_GCM_TAG_SIZE = 16;
   public static final short AES_GCM_KEY_SIZE = 32;
   public static final short AES_GCM_KEY_SIZE_BITS = 256;
+  // Cose key parameters.
+  public static final byte COSE_KEY_KEY_TYPE = 1;
+  public static final byte COSE_KEY_KEY_ID = 2;
+  public static final byte COSE_KEY_ALGORITHM = 3;
+  public static final byte COSE_KEY_KEY_OPS = 4;
+  public static final byte COSE_KEY_CURVE = -1;
+  public static final byte COSE_KEY_PUBKEY_X = -2;
+  public static final byte COSE_KEY_PUBKEY_Y = -3;
+  public static final byte COSE_KEY_PRIV_KEY = -4;
 
+  //Context strings
+  private static final byte[] MAC_CONTEXT = {0x4d, 0x41, 0x43, 0x30}; // MAC0
+  //Empty strings
+  private static final byte[] EMPTY_MAC_KEY =
+      {0x45, 0x6d, 0x70, 0x74, 0x79, 0x20, 0x4d, 0x41, 0x43, 0x20, 0x6b, 0x65, 0x79}; // "Empty MAC key"
 
+  private short getIntegerInstance(byte value) {
+    short ptr;
+    if (value >= 0)
+      ptr = KMInteger.uint_8(value);
+    else
+      ptr = KMNInteger.uint_8(value);
+
+    return ptr;
+  }
+
+  //TODO Comments
+  public void generateCoseMac0Mac(byte[] macKey, short macKeyOff, short macKeyLen, byte[] extAad, short extAadOff,
+                                  short extAadLen, byte[] payload, short payloadOff, short payloadLen,
+                                  byte[] out, short outOff) {
+    //TODO Complete this function.
+    if (macKeyLen == 0) {
+      Util.arrayCopyNonAtomic(EMPTY_MAC_KEY, (short) 0, out, outOff, (short) EMPTY_MAC_KEY.length);
+    }
+    // Create MAC Structure and compute HMAC as per https://tools.ietf.org/html/rfc8152#section-6.3
+    short arrPtr = KMArray.instance(COSE_MAC0_ENTRY_COUNT);
+    KMArray.cast(arrPtr).add((short) 0, KMTextString.instance(MAC_CONTEXT, (short) 0, (short) MAC_CONTEXT.length));
+    short mapPtr = KMMap.instance((short) 1);
+    KMMap.cast(mapPtr).add((short) 0, getIntegerInstance(COSE_LABEL_ALGORITHM), getIntegerInstance(COSE_ALG_HMAC_256));
+    KMMap.cast(mapPtr).canonicalize();
+    KMArray.cast(arrPtr).add((short) 1, mapPtr);
+    KMArray.cast(arrPtr).add((short) 2, KMByteBlob.instance(extAad, extAadOff, extAadLen));
+    KMArray.cast(arrPtr).add((short) 3, KMByteBlob.instance(payload, payloadOff, payloadLen));
+  }
 }

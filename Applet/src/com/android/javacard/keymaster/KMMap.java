@@ -75,6 +75,10 @@ public class KMMap extends KMType {
       heap, (short) (instanceTable[KM_MAP_OFFSET] + TLV_HEADER_SIZE + MAP_HEADER_SIZE + (short) (index * 4 + 2)));
   }
 
+  public void canonicalize() {
+    //TODO
+  }
+
   public short containedType() {
     return Util.getShort(heap, (short) (instanceTable[KM_MAP_OFFSET] + TLV_HEADER_SIZE));
   }
