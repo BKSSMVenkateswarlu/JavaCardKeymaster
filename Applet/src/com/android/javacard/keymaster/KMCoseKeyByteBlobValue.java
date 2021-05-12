@@ -40,7 +40,7 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
   public static short exp() {
     short ptr = instance(COSE_KEY_TAG_TYPE, (short) 4);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.INVALID_VALUE);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMByteBlob.exp());
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), KMByteBlob.exp());
     return ptr;
   }
 
@@ -62,12 +62,8 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
     if (heap[ptr] != COSE_KEY_TAG_TYPE) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
-    // Validate the keypair.
-    short keyPtr = Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE));
+    // Validate the value pointer.
     short valuePtr = Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2));
-    if (!KMCoseKeyTypeValue.isKeyTypeValid(keyPtr)) {
-      ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
-    }
     if (KMType.getType(valuePtr) != BYTE_BLOB_TYPE) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
@@ -76,6 +72,16 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
 
   public short getValueType() {
     return BYTE_BLOB_TYPE;
+  }
+
+  @Override
+  public short getKeyPtr() {
+    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_BYTE_BLOB_VAL_OFFSET] + TLV_HEADER_SIZE));
+  }
+
+  @Override
+  public short getValuePtr() {
+    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_BYTE_BLOB_VAL_OFFSET] + TLV_HEADER_SIZE + 2));
   }
 
 }

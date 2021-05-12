@@ -21,20 +21,20 @@ import javacard.framework.ISOException;
 import javacard.framework.Util;
 
 //TODO Comments
-public class KMCoseKeyTypeValue extends KMType {
+public abstract class KMCoseKeyTypeValue extends KMType {
 
   // TODO Comments
-  public static final Object allowedKeyPairs[] = new Object[]{
+  public static final Object[] allowedKeyPairs = new Object[]{
       // Key type
-      KMCose.COSE_KEY_KEY_TYPE, new byte[]{KMCose.COSE_KEY_TYPE_EC2, KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
+      new byte[] {KMCose.COSE_KEY_KEY_TYPE}, new byte[]{KMCose.COSE_KEY_TYPE_EC2, KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
       // Algorithm
-      KMCose.COSE_KEY_ALGORITHM, new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
+      new byte[] {KMCose.COSE_KEY_ALGORITHM}, new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
       KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
       // Key operations
-      KMCose.COSE_KEY_KEY_OPS, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
+      new byte[] {KMCose.COSE_KEY_KEY_OPS}, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
       KMCose.COSE_KEY_OP_ENCRYPT, KMCose.COSE_KEY_OP_DECRYPT},
       // Curve
-      KMCose.COSE_KEY_CURVE, new byte[]{KMCose.COSE_ECCURVE_256},
+      new byte[] {KMCose.COSE_KEY_CURVE}, new byte[]{KMCose.COSE_ECCURVE_256},
   };
 
   // TODO comments
@@ -45,21 +45,23 @@ public class KMCoseKeyTypeValue extends KMType {
     boolean valid = false;
     while (index < allowedKeyPairs.length) {
       valueIdx = 0;
-      if ((short) allowedKeyPairs[index] == key) {
+      if (((byte[]) allowedKeyPairs[index])[0] == (byte) key) {
         values = (byte[]) allowedKeyPairs[(short) (index + 1)];
         while (valueIdx < values.length) {
-          if (values[valueIdx] == value) {
+          if (values[valueIdx] == (byte)value) {
             valid = true;
             break;
           }
           valueIdx++;
         }
+        break;
       }
       index += (short)2;
     }
     return valid;
   }
 
+  // TODO Comments
   public static boolean isKeyTypeValid(short keyPtr) {
     short type = KMType.getType(keyPtr);
     boolean isValid = false;
@@ -86,15 +88,7 @@ public class KMCoseKeyTypeValue extends KMType {
     return value;
   }
 
-  public short getKeyPtr() {
-    return Util.getShort(heap, (short) (instanceTable[COSE_KEY_TAG_TYPE] + TLV_HEADER_SIZE));
-  }
-
-  //TODO Remove if not used.
-  public short getValuePtr() {
-    return Util.getShort(heap, (short) (instanceTable[COSE_KEY_TAG_TYPE] + TLV_HEADER_SIZE + 2));
-  }
-
+  // TODO Comments
   public static short getTagValueType(short exp) {
     short ptr = Util.getShort(heap, (short) (exp + TLV_HEADER_SIZE + 2));
     short tagValueType = 0;
@@ -109,6 +103,11 @@ public class KMCoseKeyTypeValue extends KMType {
     }
     return tagValueType;
   }
+
+  public abstract short getKeyPtr();
+
+  public abstract short getValuePtr();
+
   // TODO validate the values based on the algorithm
   // This is has to be done when using the cose key to sign
   // or encrypt.

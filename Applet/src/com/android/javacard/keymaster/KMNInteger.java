@@ -22,6 +22,7 @@ import javacard.framework.Util;
 
 public class KMNInteger extends KMInteger {
   private static KMNInteger prototype;
+  public static final byte SIGNED_MASK = (byte) 0x80;
 
   private KMNInteger() {
   }
@@ -79,6 +80,7 @@ public class KMNInteger extends KMInteger {
 
   // create integer and copy byte value
   public static short uint_8(byte num) {
+    if (num >= 0) ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     short ptr = instance(KMInteger.UINT_32);
     heap[(short) (ptr + TLV_HEADER_SIZE + 3)] = num;
     return ptr;
@@ -86,6 +88,7 @@ public class KMNInteger extends KMInteger {
 
   // create integer and copy short value
   public static short uint_16(short num) {
+    if (num >= 0) ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     short ptr = instance(KMInteger.UINT_32);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), num);
     return ptr;
@@ -93,6 +96,8 @@ public class KMNInteger extends KMInteger {
 
   // create integer and copy integer value
   public static short uint_32(byte[] num, short offset) {
+    if (!isSignedInteger(num, offset))
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     short ptr = instance(KMInteger.UINT_32);
     Util.arrayCopy(num, offset, heap, (short) (ptr + TLV_HEADER_SIZE), KMInteger.UINT_32);
     return ptr;
@@ -100,6 +105,8 @@ public class KMNInteger extends KMInteger {
 
   // create integer and copy integer value
   public static short uint_64(byte[] num, short offset) {
+    if (!isSignedInteger(num, offset))
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     short ptr = instance(KMInteger.UINT_64);
     Util.arrayCopy(num, offset, heap, (short) (ptr + TLV_HEADER_SIZE), KMInteger.UINT_64);
     return ptr;
@@ -108,5 +115,10 @@ public class KMNInteger extends KMInteger {
   @Override
   protected short getBaseOffset() {
     return instanceTable[KM_NEG_INTEGER_OFFSET];
+  }
+
+  public static boolean isSignedInteger(byte[] num, short offset) {
+    byte val = num[offset];
+    return SIGNED_MASK == (val & SIGNED_MASK);
   }
 }

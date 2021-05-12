@@ -25,6 +25,7 @@ public class KMDecoder {
 
   // major types
   private static final short UINT_TYPE = 0x00;
+  private static final short NEG_INT_TYPE = 0x20;
   private static final short BYTES_TYPE = 0x40;
   private static final short ARRAY_TYPE = 0x80;
   private static final short MAP_TYPE = 0xA0;
@@ -91,6 +92,8 @@ public class KMDecoder {
         return decodeByteBlob(exp);
       case KMType.INTEGER_TYPE:
         return decodeInteger(exp);
+      case KMType.NEG_INTEGER_TYPE:
+        return decodeNegInteger(exp);
       case KMType.ARRAY_TYPE:
         return decodeArray(exp);
       case KMType.ENUM_TYPE:
@@ -162,21 +165,74 @@ public class KMDecoder {
     return KMKeyCharacteristics.instance(vals);
   }
 
+  private short decodeCoseKeyKeyType(short exp) {
+    byte[] buffer = (byte[]) bufferRef[0];
+    short startOff = scratchBuf[START_OFFSET];
+    short keyPtr = (short) 0;
+    // Cose Key should be always either UINT or Negative int
+    if ((buffer[startOff] & MAJOR_TYPE_MASK) == UINT_TYPE) {
+      keyPtr = decodeInteger(exp);
+    } else if ((buffer[startOff] & MAJOR_TYPE_MASK) == NEG_INT_TYPE) {
+      keyPtr = decodeNegInteger(exp);
+    } else {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+    return keyPtr;
+  }
+
   private short decodeCoseKeyIntegerValue(short exp) {
-    //TODO
-    return (short) 0;
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyIntegerValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeyIntegerValue.cast(exp).getValuePtr());
+    return KMCoseKeyIntegerValue.instance(keyPtr, valuePtr);
   }
 
   private short decodeCoseKeyNegIntegerValue(short exp) {
-    //TODO
-    return (short) 0;
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyNIntegerValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeyNIntegerValue.cast(exp).getValuePtr());
+    return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
   }
 
   private short decodeCoseKeyByteBlobValue(short exp) {
-    //TODO
-    return (short) 0;
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyByteBlobValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeyByteBlobValue.cast(exp).getValuePtr());
+    return KMCoseKeyByteBlobValue.instance(keyPtr, valuePtr);
   }
 
+  private short peekCoseKeyTagType() {
+    byte[] buffer = (byte[]) bufferRef[0];
+    short startOff = scratchBuf[START_OFFSET];
+    // Cose Key should be always either UINT or Negative int
+    if ((buffer[startOff] & MAJOR_TYPE_MASK) != UINT_TYPE &&
+        (buffer[startOff] & MAJOR_TYPE_MASK) != NEG_INT_TYPE) {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+
+    short additionalMask = (short) (buffer[startOff] & ADDITIONAL_MASK);
+    short increment = 0;
+    if (additionalMask < UINT8_LENGTH) {
+      increment++;
+    } else if (additionalMask == UINT8_LENGTH) {
+      increment += 2;
+    } else if (additionalMask == UINT16_LENGTH) {
+      increment += 3;
+    } else if (additionalMask == UINT32_LENGTH) {
+      increment += 5;
+    } else {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+    short majorType = (short) (buffer[(short) (startOff + increment)] & MAJOR_TYPE_MASK);
+    short tagValueType = 0;
+    if (majorType == BYTES_TYPE) {
+      tagValueType = KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE;
+    } else if (majorType == UINT_TYPE) {
+      tagValueType = KMType.COSE_KEY_TAG_INT_VALUE_TYPE;
+    } else if (majorType == NEG_INT_TYPE) {
+      tagValueType = KMType.COSE_KEY_TAG_NINT_VALUE_TYPE;
+    } else {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+    return tagValueType;
+  }
 
   private short decodeCoseKeyTag(short tagValueType, short exp) {
     switch (tagValueType) {
@@ -193,33 +249,43 @@ public class KMDecoder {
   }
 
   private short decodeCoseKey(short exp) {
-    /*short payloadLength = readMajorTypeWithPayloadLength(MAP_TYPE);
+    short payloadLength = readMajorTypeWithPayloadLength(MAP_TYPE);
     // get allowed key pairs
     short allowedKeyPairs = KMCoseKey.cast(exp).getVals();
-    short vals = KMMap.instance(payloadLength);
-    short length = KMMap.cast(allowedKeyPairs).length();
+    short vals = KMArray.instance(payloadLength);
+    short length = KMArray.cast(allowedKeyPairs).length();
     short index = 0;
-    boolean tagFound = false;
+    boolean tagFound;
     short tagInd;
+    short coseKeyTagType;
+    short tagClass;
+    short allowedType;
+    short obj;
 
     // For each tag in payload ...
     while (index < payloadLength) {
       tagFound = false;
       tagInd = 0;
-      // Read cose key and cose value
+      coseKeyTagType = peekCoseKeyTagType();
       // Check against the allowed tags ...
       while (tagInd < length) {
+        tagClass = KMArray.cast(allowedKeyPairs).get(tagInd);
+        allowedType = KMCoseKeyTypeValue.getTagValueType(tagClass);
+        if (allowedType == coseKeyTagType) {
+          obj = decode(tagClass);
+          KMArray.cast(vals).add(index, obj);
+          tagFound = true;
+          break;
+        }
+        tagInd++;
       }
-      tagInd++;
+      if (!tagFound) {
+        ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+      } else {
+        index++;
+      }
     }
-    if (!tagFound) {
-      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
-    } else {
-      index++;
-    }
-    return KMCoseKey.instance(vals);*/
-    //TODO
-    return (short) 0;
+    return KMCoseKey.instance(vals);
   }
 
   private short decodeKeyParam(short exp) {
@@ -419,6 +485,61 @@ public class KMDecoder {
     return inst;
   }
 
+  private short decodeNegIntegerValue(byte addInfo, byte[] buf, short startOffset) {
+    short inst;
+    short len = 0;
+    short scratchpad;
+    if (addInfo < UINT8_LENGTH) {
+      addInfo = (byte) (-1 - addInfo);
+      inst = KMNInteger.uint_8(addInfo);
+    } else {
+      switch (addInfo) {
+        case UINT8_LENGTH:
+          len = 1;
+          break;
+        case UINT16_LENGTH:
+          len = 2;
+          break;
+        case UINT32_LENGTH:
+          len = 4;
+          break;
+        case UINT64_LENGTH:
+          len = 8;
+          break;
+        default:
+          ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+      }
+      // Do (-1 - N), as per cbor negative integer decoding rule.
+      // N is the integer value.
+      scratchpad = KMByteBlob.instance((short) (len * 3));
+      byte[] input = KMByteBlob.cast(scratchpad).getBuffer();
+      short offset = KMByteBlob.cast(scratchpad).getStartOff();
+      Util.arrayFillNonAtomic(input, offset, len, (byte) -1);
+      Util.arrayCopyNonAtomic(buf, startOffset, input, (short) (offset + len), len);
+      KMUtils.subtract(input, offset, (short) (offset + len), (short) (offset + 2 * len), (byte) len);
+      inst = KMNInteger.instance(input, (short) (offset + 2 * len), len);
+      incrementStartOff(len);
+    }
+    return inst;
+  }
+
+  private short decodeNegInteger(short exp) {
+    short startOff = scratchBuf[START_OFFSET];
+    byte[] buffer = (byte[]) bufferRef[0];
+    if ((buffer[startOff] & MAJOR_TYPE_MASK) != NEG_INT_TYPE) {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+    short len = (short) (buffer[startOff] & ADDITIONAL_MASK);
+    if (len > UINT64_LENGTH) {
+      ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
+    }
+    incrementStartOff((short) 1);
+    // startOff  is incremented so update the startOff
+    // with latest value before using it.
+    startOff = scratchBuf[START_OFFSET];
+    return decodeNegIntegerValue((byte) len, buffer, startOff);
+  }
+
   private short decodeByteBlob(short exp) {
     short payloadLength = readMajorTypeWithPayloadLength(BYTES_TYPE);
     short inst = KMByteBlob.instance((byte[]) bufferRef[0], scratchBuf[START_OFFSET], payloadLength);
@@ -460,7 +581,7 @@ public class KMDecoder {
 
   // payload length cannot be more then 16 bits.
   private short readMajorTypeWithPayloadLength(short majorType) {
-    short payloadLength = 0;
+    short payloadLength;
     byte val = readByte();
     if ((short) (val & MAJOR_TYPE_MASK) != majorType) {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);

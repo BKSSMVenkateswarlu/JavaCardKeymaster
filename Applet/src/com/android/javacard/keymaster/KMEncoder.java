@@ -25,6 +25,7 @@ public class KMEncoder {
 
   // major types
   private static final byte UINT_TYPE = 0x00;
+  private static final byte NEG_INT_TYPE = 0x20;
   private static final byte BYTES_TYPE = 0x40;
   private static final byte ARRAY_TYPE = (byte) 0x80;
   private static final byte MAP_TYPE = (byte) 0xA0;
@@ -98,7 +99,7 @@ public class KMEncoder {
     scratchBuf[LEN_OFFSET] += (short) (1 + getEncodedIntegerLength(errInt32Ptr));
 
     writeMajorTypeWithLength(ARRAY_TYPE, (short) 2); // Array of 2 elements
-    encodeInteger(errInt32Ptr);
+    encodeUnsignedInteger(errInt32Ptr);
   }
 
   //array{KMError.OK,Array{KMByteBlobs}}
@@ -123,7 +124,7 @@ public class KMEncoder {
     }
     bufferStart = scratchBuf[START_OFFSET];
     writeMajorTypeWithLength(ARRAY_TYPE, (short) 2); // Array of 2 elements
-    encodeInteger(errInt32Ptr); //PowerResetStatus + ErrorCode
+    encodeUnsignedInteger(errInt32Ptr); //PowerResetStatus + ErrorCode
     writeMajorTypeWithLength(ARRAY_TYPE, (short) 1); // Array of 1 element
     writeMajorTypeWithLength(BYTES_TYPE, certLength); // Cert Byte Blob of length
     return bufferStart;
@@ -133,7 +134,7 @@ public class KMEncoder {
     bufferRef[0] = buffer;
     scratchBuf[START_OFFSET] = startOff;
     scratchBuf[LEN_OFFSET] = (short) (startOff + length + 1);
-    encodeInteger(errInt32Ptr);
+    encodeUnsignedInteger(errInt32Ptr);
     return (short) (scratchBuf[START_OFFSET] - startOff);
   }
 
@@ -146,7 +147,10 @@ public class KMEncoder {
           encodeByteBlob(exp);
           break;
         case KMType.INTEGER_TYPE:
-          encodeInteger(exp);
+          encodeUnsignedInteger(exp);
+          break;
+        case KMType.NEG_INTEGER_TYPE:
+          encodeNegInteger(exp);
           break;
         case KMType.ARRAY_TYPE:
           encodeArray(exp);
@@ -156,6 +160,9 @@ public class KMEncoder {
           break;
         case KMType.KEY_PARAM_TYPE:
           encodeKeyParam(exp);
+          break;
+        case KMType.COSE_KEY_TYPE:
+          encodeCoseKey(exp);
           break;
         case KMType.KEY_CHAR_TYPE:
           encodeKeyChar(exp);
@@ -173,9 +180,50 @@ public class KMEncoder {
           short tagType = KMTag.getTagType(exp);
           encodeTag(tagType, exp);
           break;
+        case KMType.COSE_KEY_TAG_TYPE:
+          short coseKeyTagType = KMCoseKeyTypeValue.getTagValueType(exp);
+          encodeCoseKeyTag(coseKeyTagType, exp);
+          break;
         default:
           ISOException.throwIt(ISO7816.SW_DATA_INVALID);
       }
+    }
+  }
+
+  private void encodeCoseKeyIntegerValue(short exp) {
+    KMCoseKeyIntegerValue coseKeyIntVal = KMCoseKeyIntegerValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeyIntVal.getValuePtr());
+    encode(coseKeyIntVal.getKeyPtr());
+  }
+
+  private void encodeCoseKeyByteBlobValue(short exp) {
+    KMCoseKeyByteBlobValue coseKeyByteBlobValue = KMCoseKeyByteBlobValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeyByteBlobValue.getValuePtr());
+    encode(coseKeyByteBlobValue.getKeyPtr());
+  }
+
+  private void encodeCoseKeyNegIntegerValue(short exp) {
+    KMCoseKeyNIntegerValue coseKeyNIntegerValue = KMCoseKeyNIntegerValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeyNIntegerValue.getValuePtr());
+    encode(coseKeyNIntegerValue.getKeyPtr());
+  }
+
+  private void encodeCoseKeyTag(short tagType, short exp) {
+    switch (tagType) {
+      case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
+        encodeCoseKeyByteBlobValue(exp);
+        return;
+      case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
+        encodeCoseKeyIntegerValue(exp);
+        return;
+      case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
+        encodeCoseKeyNegIntegerValue(exp);
+        return;
+      default:
+        ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
   }
 
@@ -205,6 +253,10 @@ public class KMEncoder {
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
+  }
+
+  private void encodeCoseKey(short obj) {
+    encodeAsMap(KMCoseKey.cast(obj).getVals());
   }
 
   private void encodeKeyParam(short obj) {
@@ -321,11 +373,8 @@ public class KMEncoder {
     }
     return 0;
   }
-  
-  private void encodeInteger(short obj) {
-    byte[] val = KMInteger.cast(obj).getBuffer();
-    short len = KMInteger.cast(obj).length();
-    short startOff = KMInteger.cast(obj).getStartOff();
+
+  private void encodeInteger(byte[] val, short len, short startOff, short majorType) {
     byte index = 0;
     // find out the most significant byte
     while (index < len) {
@@ -339,23 +388,71 @@ public class KMEncoder {
     // find the difference between most significant byte and len
     short diff = (short) (len - index);
     if (diff == 0) {
-      writeByte((byte) (UINT_TYPE | 0));
+      writeByte((byte) (majorType | 0));
     } else if ((diff == 1) && (val[(short) (startOff + index)] < UINT8_LENGTH)
         && (val[(short) (startOff + index)] >= 0)) {
-      writeByte((byte) (UINT_TYPE | val[(short) (startOff + index)]));
+      writeByte((byte) (majorType | val[(short) (startOff + index)]));
     } else if (diff == 1) {
-      writeByte((byte) (UINT_TYPE | UINT8_LENGTH));
+      writeByte((byte) (majorType | UINT8_LENGTH));
       writeByte(val[(short) (startOff + index)]);
     } else if (diff == 2) {
-      writeByte((byte) (UINT_TYPE | UINT16_LENGTH));
+      writeByte((byte) (majorType | UINT16_LENGTH));
       writeBytes(val, (short) (startOff + index), (short) 2);
     } else if (diff <= 4) {
-      writeByte((byte) (UINT_TYPE | UINT32_LENGTH));
+      writeByte((byte) (majorType | UINT32_LENGTH));
       writeBytes(val, (short) (startOff + len - 4), (short) 4);
     } else {
-      writeByte((byte) (UINT_TYPE | UINT64_LENGTH));
+      writeByte((byte) (majorType | UINT64_LENGTH));
       writeBytes(val, startOff, (short) 8);
     }
+  }
+
+
+  public void encodeNegIntegerValue(byte[] buf, short offset, short len) {
+    byte index = 0;
+    // find out the most significant byte
+    while (index < len) {
+      if (buf[(short) (offset + index)] > 0) {
+        break;
+      } else if (buf[(short) (offset + index)] < 0) {
+        break;
+      }
+      index++; // index will be equal to len if value is 0.
+    }
+    short diff = (short) (len - index);
+    short correctedOffset = offset;
+    short correctedLen = len;
+    // Do -1-N, where N is the negative integer
+    // The value of -1-N is equal to the 1s compliment of N.
+    if (diff == 0) {
+      // Fail
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    } else if (diff == 1) {
+      correctedOffset = (short) (offset + 3);
+      correctedLen = 1;
+    } else if (diff == 2) {
+      correctedOffset = (short) (offset + 2);
+      correctedLen = 2;
+    }
+    // For int and long values the len and offset values are always proper.
+    // int - 4 bytes
+    // long - 8 bytes.
+    KMUtils.computeOnesCompliment(buf, correctedOffset, correctedLen);
+  }
+
+  private void encodeNegInteger(short obj) {
+    byte[] val = KMNInteger.cast(obj).getBuffer();
+    short len = KMNInteger.cast(obj).length();
+    short startOff = KMNInteger.cast(obj).getStartOff();
+    encodeNegIntegerValue(val, startOff, len);
+    encodeInteger(val, len, startOff, NEG_INT_TYPE);
+  }
+
+  private void encodeUnsignedInteger(short obj) {
+    byte[] val = KMInteger.cast(obj).getBuffer();
+    short len = KMInteger.cast(obj).length();
+    short startOff = KMInteger.cast(obj).getStartOff();
+    encodeInteger(val, len, startOff, UINT_TYPE);
   }
 
   private void encodeByteBlob(short obj) {
