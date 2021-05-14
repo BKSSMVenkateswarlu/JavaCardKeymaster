@@ -38,9 +38,10 @@ public class KMCoseKeyNIntegerValue extends KMCoseKeyTypeValue {
 
   // pointer to an empty instance used as expression
   public static short exp() {
-    short ptr = instance(COSE_KEY_TAG_TYPE, (short) 4);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.INVALID_VALUE);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), KMNInteger.exp());
+    short ptr = instance(COSE_KEY_TAG_TYPE, (short) 6);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_KEY_TAG_NINT_VALUE_TYPE);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), KMType.INVALID_VALUE);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 4), KMNInteger.exp());
     return ptr;
   }
 
@@ -50,7 +51,7 @@ public class KMCoseKeyNIntegerValue extends KMCoseKeyTypeValue {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     // Validate the value ptr.
-    short valuePtr = Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2));
+    short valuePtr = Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE + 4));
     if (NEG_INTEGER_TYPE != getType(valuePtr)) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
@@ -58,12 +59,15 @@ public class KMCoseKeyNIntegerValue extends KMCoseKeyTypeValue {
   }
 
   public static short instance(short keyPtr, short valuePtr) {
-    if (!KMCoseKeyTypeValue.isKeyPairValid(KMCoseKeyTypeValue.getKey(keyPtr), KMNInteger.cast(valuePtr).getShort())) {
+    short offset = KMCoseKeyTypeValue.getKeyStartOffset(keyPtr);
+    if (!KMCoseKeyTypeValue.isKeyPairValid(heap, offset, KMCose.COSE_KEY_MAX_SIZE,
+        KMNInteger.cast(valuePtr).getShort())) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
-    short ptr = KMType.instance(COSE_KEY_TAG_TYPE, (short) 4);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), keyPtr);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), valuePtr);
+    short ptr = KMType.instance(COSE_KEY_TAG_TYPE, (short) 6);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_KEY_TAG_NINT_VALUE_TYPE);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), keyPtr);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 4), valuePtr);
     return ptr;
   }
 
@@ -73,12 +77,12 @@ public class KMCoseKeyNIntegerValue extends KMCoseKeyTypeValue {
 
   @Override
   public short getKeyPtr() {
-    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_NINT_VAL_OFFSET] + TLV_HEADER_SIZE));
+    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_NINT_VAL_OFFSET] + TLV_HEADER_SIZE + 2));
   }
 
   @Override
   public short getValuePtr() {
-    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_NINT_VAL_OFFSET] + TLV_HEADER_SIZE + 2));
+    return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_NINT_VAL_OFFSET] + TLV_HEADER_SIZE + 4));
   }
 
 }

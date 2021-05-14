@@ -27,8 +27,10 @@ public class KMDecoder {
   private static final short UINT_TYPE = 0x00;
   private static final short NEG_INT_TYPE = 0x20;
   private static final short BYTES_TYPE = 0x40;
+  private static final short TSTR_TYPE = 0x60;
   private static final short ARRAY_TYPE = 0x80;
   private static final short MAP_TYPE = 0xA0;
+  private static final short SIMPLE_VALUE_TYPE = 0xE0;
 
   // masks
   private static final short ADDITIONAL_MASK = 0x1F;
@@ -90,12 +92,18 @@ public class KMDecoder {
     switch (type) {
       case KMType.BYTE_BLOB_TYPE:
         return decodeByteBlob(exp);
+      case KMType.TEXT_STRING_TYPE:
+        return decodeTstr(exp);
       case KMType.INTEGER_TYPE:
         return decodeInteger(exp);
+      case KMType.SIMPLE_VALUE_TYPE:
+        return decodeSimpleValue(exp);
       case KMType.NEG_INTEGER_TYPE:
         return decodeNegInteger(exp);
       case KMType.ARRAY_TYPE:
         return decodeArray(exp);
+      case KMType.MAP_TYPE:
+        return decodeMap(exp);
       case KMType.ENUM_TYPE:
         return decodeEnum(exp);
       case KMType.KEY_PARAM_TYPE:
@@ -180,6 +188,12 @@ public class KMDecoder {
     return keyPtr;
   }
 
+  private short decodeCoseKeySimpleValue(short exp) {
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeySimpleValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeySimpleValue.cast(exp).getValuePtr());
+    return KMCoseKeySimpleValue.instance(keyPtr, valuePtr);
+  }
+
   private short decodeCoseKeyIntegerValue(short exp) {
     short keyPtr = decodeCoseKeyKeyType((KMCoseKeyIntegerValue.cast(exp).getKeyPtr()));
     short valuePtr = decode(KMCoseKeyIntegerValue.cast(exp).getValuePtr());
@@ -242,6 +256,8 @@ public class KMDecoder {
         return decodeCoseKeyNegIntegerValue(exp);
       case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
         return decodeCoseKeyIntegerValue(exp);
+      case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
+        return decodeCoseKeySimpleValue(exp);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
@@ -354,6 +370,24 @@ public class KMDecoder {
     return KMByteTag.instance(scratchBuf[TAG_KEY_OFFSET], decode(KMByteTag.cast(exp).getValue()));
   }
 
+  private short decodeMap(short exp) {
+    short payloadLength = readMajorTypeWithPayloadLength(MAP_TYPE);
+    short mapPtr = KMMap.instance(payloadLength);
+    short index = 0;
+    short type;
+    short keyobj;
+    short valueobj;
+    while (index < payloadLength) {
+      type = KMMap.cast(exp).getKey(index);
+      keyobj = decode(type);
+      type = KMMap.cast(exp).getKeyValue(index);
+      valueobj = decode(type);
+      KMMap.cast(mapPtr).add(index, keyobj, valueobj);
+      index++;
+    }
+    return mapPtr;
+  }
+
   private short decodeArray(short exp) {
     short payloadLength = readMajorTypeWithPayloadLength(ARRAY_TYPE);
     short arrPtr = KMArray.instance(payloadLength);
@@ -452,6 +486,18 @@ public class KMDecoder {
     return KMEnum.instance(KMEnum.cast(exp).getEnumType(), enumVal);
   }
 
+  private short decodeSimpleValue(short exp) {
+    short inst;
+    short startOff = scratchBuf[START_OFFSET];
+    byte[] buffer = (byte[]) bufferRef[0];
+    if ((buffer[startOff] & MAJOR_TYPE_MASK) != SIMPLE_VALUE_TYPE) {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
+    byte addInfo = (byte) (buffer[startOff] & ADDITIONAL_MASK);
+    incrementStartOff((short) 1);
+    return KMSimpleValue.instance(addInfo);
+  }
+
   private short decodeInteger(short exp) {
     short inst;
     short startOff = scratchBuf[START_OFFSET];
@@ -538,6 +584,13 @@ public class KMDecoder {
     // with latest value before using it.
     startOff = scratchBuf[START_OFFSET];
     return decodeNegIntegerValue((byte) len, buffer, startOff);
+  }
+
+  private short decodeTstr(short exp) {
+    short payloadLength = readMajorTypeWithPayloadLength(TSTR_TYPE);
+    short inst = KMTextString.instance((byte[]) bufferRef[0], scratchBuf[START_OFFSET], payloadLength);
+    incrementStartOff(payloadLength);
+    return inst;
   }
 
   private short decodeByteBlob(short exp) {

@@ -112,6 +112,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   private static final byte INS_DEVICE_LOCKED_CMD = INS_END_KM_PROVISION_CMD + 20;//0x34
   private static final byte INS_EARLY_BOOT_ENDED_CMD = INS_END_KM_PROVISION_CMD + 21; //0x35
   private static final byte INS_GET_CERT_CHAIN_CMD = INS_END_KM_PROVISION_CMD + 22; //0x36
+  private static final byte INS_GENERATE_PROVISIONING_KEY_CMD = INS_END_KM_PROVISION_CMD + 23; //0x37
 
   private static final byte INS_END_KM_CMD = 0x7F;
 
@@ -479,6 +480,9 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
           case INS_SET_VERSION_PATCHLEVEL_CMD:
             processSetVersionAndPatchLevels(apdu);
             break;
+          case INS_GENERATE_PROVISIONING_KEY_CMD:
+            processGenerateProvisioningKeyCmd(apdu);
+            break;
           default:
             ISOException.throwIt(ISO7816.SW_INS_NOT_SUPPORTED);
         }
@@ -677,19 +681,19 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     tmpVariables[2] = KMArray.cast(args).get((short) 2);
 
     repository.setOsVersion(
-      KMInteger.cast(tmpVariables[0]).getBuffer(),
-      KMInteger.cast(tmpVariables[0]).getStartOff(),
-      KMInteger.cast(tmpVariables[0]).length());
+        KMInteger.cast(tmpVariables[0]).getBuffer(),
+        KMInteger.cast(tmpVariables[0]).getStartOff(),
+        KMInteger.cast(tmpVariables[0]).length());
 
     repository.setOsPatch(
-      KMInteger.cast(tmpVariables[1]).getBuffer(),
-      KMInteger.cast(tmpVariables[1]).getStartOff(),
-      KMInteger.cast(tmpVariables[1]).length());
+        KMInteger.cast(tmpVariables[1]).getBuffer(),
+        KMInteger.cast(tmpVariables[1]).getStartOff(),
+        KMInteger.cast(tmpVariables[1]).length());
 
     repository.setVendorPatchLevel(
-      KMInteger.cast(tmpVariables[2]).getBuffer(),
-      KMInteger.cast(tmpVariables[2]).getStartOff(),
-      KMInteger.cast(tmpVariables[2]).length());
+        KMInteger.cast(tmpVariables[2]).getBuffer(),
+        KMInteger.cast(tmpVariables[2]).getStartOff(),
+        KMInteger.cast(tmpVariables[2]).length());
 
     sendError(apdu, KMError.OK);
   }
@@ -3261,6 +3265,129 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     // Hmac is cleared, so generate a new Hmac nonce.
     seProvider.newRandomNumber(scratchPad, (short) 0, KMRepository.HMAC_SEED_NONCE_SIZE);
     repository.initHmacNonce(scratchPad, (short) 0, KMRepository.HMAC_SEED_NONCE_SIZE);
+  }
+
+  private static short getAttestKeyParameters() {
+    short tagIndex = 0;
+    short arrPtr = KMArray.instance((short) 6);
+    // Key size - 256
+    short keySize = KMIntegerTag
+        .instance(KMType.UINT_TAG, KMType.KEYSIZE, KMInteger.uint_16((short) 256));
+    // Digest - SHA256
+    short byteBlob = KMByteBlob.instance((short) 1);
+    KMByteBlob.cast(byteBlob).add((short) 0, KMType.SHA2_256);
+    short digest = KMEnumArrayTag.instance(KMType.DIGEST, byteBlob);
+    // Purpose - Attest
+    byteBlob = KMByteBlob.instance((short) 1);
+    KMByteBlob.cast(byteBlob).add((short) 0, KMType.ATTEST_KEY);
+    short purpose = KMEnumArrayTag.instance(KMType.PURPOSE, byteBlob);
+
+    KMArray.cast(arrPtr).add(tagIndex++, purpose);
+    // Algorithm - EC
+    KMArray.cast(arrPtr).add(tagIndex++, KMEnumTag.instance(KMType.ALGORITHM, KMType.EC));
+    KMArray.cast(arrPtr).add(tagIndex++, keySize);
+    KMArray.cast(arrPtr).add(tagIndex++, digest);
+    // Curve - P256
+    KMArray.cast(arrPtr).add(tagIndex++, KMEnumTag.instance(KMType.ECCURVE, KMType.P_256));
+    // No Authentication is required to use this key.
+    KMArray.cast(arrPtr).add(tagIndex++, KMBoolTag.instance(KMType.NO_AUTH_REQUIRED));
+    return KMKeyParameters.instance(arrPtr);
+  }
+
+  /**
+   * This function generates an ECDSA key pair with Attest key as purpose and creates an encrypted keyblob.
+   * It constructs a COSE_Key object for the generated ECDSA key pair and use this COSE_Key object as a payload
+   * when constructing the COSE_MAC0 object.
+   */
+  private static void processGenerateProvisioningKeyCmd(APDU apdu) {
+    // Receive the incoming request fully from the master into buffer.
+    receiveIncoming(apdu);
+    // Re-purpose the apdu buffer as scratch pad.
+    byte[] scratchPad = apdu.getBuffer();
+    tmpVariables[1] = KMArray.instance((short) 1);
+    KMArray.cast(tmpVariables[1]).add((short) 0, KMSimpleValue.exp());
+    tmpVariables[2] = decoder.decode(tmpVariables[1], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET],
+        bufferProp[BUF_LEN_OFFSET]);
+    // test mode flag.
+    tmpVariables[2] = KMArray.cast(tmpVariables[2]).get((short) 0);
+    boolean testMode = (KMSimpleValue.TRUE == KMSimpleValue.cast(tmpVariables[2]).getValue());
+    data[KEY_PARAMETERS] = getAttestKeyParameters();
+    generateECKeys(scratchPad);
+    // create key blob
+    data[ORIGIN] = KMType.GENERATED;
+    createEncryptedKeyBlob(scratchPad);
+    // divide pub_key to x and y
+    // tmpVariables[3] holds length and tmpVariables[4] holds offset.
+    tmpVariables[3] = KMByteBlob.cast(data[PUB_KEY]).length();
+    tmpVariables[4] = KMByteBlob.cast(data[PUB_KEY]).getStartOff();
+    byte[] buf = KMByteBlob.cast(data[PUB_KEY]).getBuffer();
+    if (buf[tmpVariables[4]] == 0x04) { // uncompressed format
+      tmpVariables[3]--;
+      tmpVariables[4]++;
+    }
+    tmpVariables[3] = (short) (tmpVariables[3] / 2);
+    short xPtr = KMByteBlob.instance(buf, tmpVariables[4], tmpVariables[3]);
+    short yPtr = KMByteBlob.instance(buf, (short) (tmpVariables[4] + tmpVariables[3]), tmpVariables[3]);
+
+    // prepare cosekey
+    short coseKey =
+        KMCose.constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMType.INVALID_VALUE,
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            xPtr,
+            yPtr,
+            testMode);
+    KMCoseKey.cast(coseKey).canonicalize();
+    // Encode the cose key and make it as payload.
+    tmpVariables[1] = encoder.encode(coseKey, scratchPad, (short) 0);
+    short payload = KMByteBlob.instance(tmpVariables[1]);
+    Util.arrayCopyNonAtomic(scratchPad, (short) 0, KMByteBlob.cast(payload).getBuffer(),
+        KMByteBlob.cast(payload).getStartOff(), tmpVariables[1]);
+    // Get the mackey.
+    short macKey = KMByteBlob.instance((short) 32);
+    if (testMode) {
+      Util.arrayFillNonAtomic(KMByteBlob.cast(macKey).getBuffer(),
+          KMByteBlob.cast(macKey).getStartOff(), (short) 32, (byte) 0);
+    } else {
+      // TODO get the key from persistent memory and copy to tmpVariables[1] offset.
+    }
+    // Prepare protected header, which is required to construct the COSE_MAC0
+    short mapPtr = KMMap.instance((short) 1);
+    KMMap.cast(mapPtr).add((short) 0, KMInteger.uint_8(KMCose.COSE_LABEL_ALGORITHM),
+        KMInteger.uint_8(KMCose.COSE_ALG_HMAC_256));
+    KMMap.cast(mapPtr).canonicalize();
+    // Encode the protected header as byte blob.
+    short len = encoder.encode(mapPtr, scratchPad, (short) 0);
+    short protectedHeader = KMByteBlob.instance(len);
+    Util.arrayCopyNonAtomic(scratchPad, (short) 0, KMByteBlob.cast(protectedHeader).getBuffer(),
+        KMByteBlob.cast(protectedHeader).getStartOff(), len);
+    // create MAC_Structure
+    tmpVariables[1] =
+        KMCose.constructCoseMacStructure(protectedHeader, KMByteBlob.instance((short) 0), payload);
+    // Encode the Mac_structure and do HMAC_Sign to produce the tag for COSE_MAC0
+    len = encoder.encode(tmpVariables[1], scratchPad, (short) 0);
+    // HMAC Sign.
+    short hmacLen = seProvider.hmacSign(KMByteBlob.cast(macKey).getBuffer(), KMByteBlob.cast(macKey).getStartOff(),
+        (short) 32, scratchPad, (short) 0, len, scratchPad, len);
+    // Create COSE_MAC0 object
+    tmpVariables[1] =
+        KMCose.constructCoseMac0(protectedHeader, payload,
+            KMByteBlob.instance(scratchPad, len, (short) (len + hmacLen)));
+
+    // Encode the COSE_MAC0 object
+    tmpVariables[1] = encoder.encode(tmpVariables[1], scratchPad, (short) 0);
+
+    tmpVariables[2] = KMArray.instance((short) 3);
+    KMArray.cast(tmpVariables[2]).add((short) 0, buildErrorStatus(KMError.OK));
+    KMArray.cast(tmpVariables[2]).add((short) 1, data[KEY_BLOB]);
+    KMArray.cast(tmpVariables[2]).add((short) 2, KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[1]));
+    bufferProp[BUF_START_OFFSET] = repository.allocAvailableMemory();
+    // Encode the response
+    bufferProp[BUF_LEN_OFFSET] = encoder.encode(tmpVariables[2], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET]);
+    sendOutgoing(apdu);
   }
 
   private static void processGenerateKey(APDU apdu) {

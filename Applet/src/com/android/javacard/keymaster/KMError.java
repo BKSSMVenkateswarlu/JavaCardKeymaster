@@ -91,4 +91,11 @@ public class KMError {
   //Generic Unknown error.
   public static final short GENERIC_UNKNOWN_ERROR = 10013;
 
+  // Remote key provisioning.
+  public static final short STATUS_FAILED = 1;
+  public static final short STATUS_INVALID_MAC = 2;
+  public static final short STATUS_PRODUCTION_KEY_IN_TEST_REQUEST = 3;
+  public static final short STATUS_TEST_KEY_IN_PRODUCTION_REQUEST = 4;
+  public static final short STATUS_INVALID_EEK = 5;
+
 }

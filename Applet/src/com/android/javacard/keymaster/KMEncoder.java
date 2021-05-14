@@ -27,8 +27,10 @@ public class KMEncoder {
   private static final byte UINT_TYPE = 0x00;
   private static final byte NEG_INT_TYPE = 0x20;
   private static final byte BYTES_TYPE = 0x40;
+  private static final byte TSTR_TYPE = 0x60;
   private static final byte ARRAY_TYPE = (byte) 0x80;
   private static final byte MAP_TYPE = (byte) 0xA0;
+  private static final byte SIMPLE_VALUE_TYPE = (byte) 0xE0;
 
   // masks
   private static final byte ADDITIONAL_MASK = 0x1F;
@@ -146,14 +148,23 @@ public class KMEncoder {
         case KMType.BYTE_BLOB_TYPE:
           encodeByteBlob(exp);
           break;
+        case KMType.TEXT_STRING_TYPE:
+          encodeTextString(exp);
+          break;
         case KMType.INTEGER_TYPE:
           encodeUnsignedInteger(exp);
+          break;
+        case KMType.SIMPLE_VALUE_TYPE:
+          encodeSimpleValue(exp);
           break;
         case KMType.NEG_INTEGER_TYPE:
           encodeNegInteger(exp);
           break;
         case KMType.ARRAY_TYPE:
           encodeArray(exp);
+          break;
+        case KMType.MAP_TYPE:
+          encodeMap(exp);
           break;
         case KMType.ENUM_TYPE:
           encodeEnum(exp);
@@ -204,6 +215,13 @@ public class KMEncoder {
     encode(coseKeyByteBlobValue.getKeyPtr());
   }
 
+  private void encodeCoseKeySimpleValue(short exp) {
+    KMCoseKeySimpleValue coseKeySimpleValue = KMCoseKeySimpleValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeySimpleValue.getValuePtr());
+    encode(coseKeySimpleValue.getKeyPtr());
+  }
+
   private void encodeCoseKeyNegIntegerValue(short exp) {
     KMCoseKeyNIntegerValue coseKeyNIntegerValue = KMCoseKeyNIntegerValue.cast(exp);
     // push key and value ptr in stack to get encoded.
@@ -221,6 +239,9 @@ public class KMEncoder {
         return;
       case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
         encodeCoseKeyNegIntegerValue(exp);
+        return;
+      case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
+        encodeCoseKeySimpleValue(exp);
         return;
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
@@ -285,6 +306,17 @@ public class KMEncoder {
     short index = (short) (len - 1);
     while (index >= 0) {
       encode(KMArray.cast(obj).get(index));
+      index--;
+    }
+  }
+
+  private void encodeMap(short obj) {
+    writeMajorTypeWithLength(MAP_TYPE, KMMap.cast(obj).length());
+    short len = KMMap.cast(obj).length();
+    short index = (short) (len - 1);
+    while (index >= 0) {
+      encode(KMMap.cast(obj).getKeyValue(index));
+      encode(KMMap.cast(obj).getKey(index));
       index--;
     }
   }
@@ -453,6 +485,17 @@ public class KMEncoder {
     short len = KMInteger.cast(obj).length();
     short startOff = KMInteger.cast(obj).getStartOff();
     encodeInteger(val, len, startOff, UINT_TYPE);
+  }
+
+  private void encodeSimpleValue(short obj) {
+    byte value = KMSimpleValue.cast(obj).getValue();
+    writeByte((byte) (SIMPLE_VALUE_TYPE | value));
+  }
+
+  private void encodeTextString(short obj) {
+    writeMajorTypeWithLength(TSTR_TYPE, KMTextString.cast(obj).length());
+    writeBytes(KMTextString.cast(obj).getBuffer(), KMTextString.cast(obj).getStartOff(),
+        KMTextString.cast(obj).length());
   }
 
   private void encodeByteBlob(short obj) {

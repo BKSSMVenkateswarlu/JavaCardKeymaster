@@ -71,4 +71,8 @@ public class KMCoseKey extends KMType {
     return KMArray.cast(arrPtr).length();
   }
 
+  public void canonicalize() {
+    // TODO
+  }
+
 }

@@ -20,35 +20,62 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
-//TODO Comments
+/**
+ * This class represents the COSE_Key as defined in https://datatracker.ietf.org/doc/html/rfc8152#section-7.
+ * This is basically a map containing key value pairs. The label for the key can be (uint / int / tstr) and
+ * the value can be of any type. But this class is confined to support only key and value types which are
+ * required for remote key provisioning. So keys of type (int / uint) and values of type (int / uint / simple / bstr)
+ * only are supported. The structure representing all the sub classes of KMCoseKeyTypeValue is as follows:
+ * KM_COSE_KEY_TAG_TYPE(1byte), Length(2 bytes), COSE_KEY_TAG_*_VALUE_TYPE(2 bytes), Key(2 bytes), Value(2 bytes).
+ * Key can be either KMInteger or KMNInteger and Value can be either KMIntger or KMNinteger or KMSimpleValue
+ * or KMByteBlob. Each subclass of KMCoseKeyTypeValue is named after their corresponding value types.
+ */
 public abstract class KMCoseKeyTypeValue extends KMType {
 
-  // TODO Comments
+  /**
+   * Below table represents the allowed values for a key. The maximum length of the key
+   * can be 4 bytes so each key is represented as 4 bytes. The allowed values are
+   * placed next to their corresponding key.
+   */
   public static final Object[] allowedKeyPairs = new Object[]{
       // Key type
-      new byte[] {KMCose.COSE_KEY_KEY_TYPE}, new byte[]{KMCose.COSE_KEY_TYPE_EC2, KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
+      new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_TYPE}, new byte[]{KMCose.COSE_KEY_TYPE_EC2,
+      KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
       // Algorithm
-      new byte[] {KMCose.COSE_KEY_ALGORITHM}, new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
-      KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
+      new byte[]{0, 0, 0, KMCose.COSE_KEY_ALGORITHM},
+      new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
+          KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
       // Key operations
-      new byte[] {KMCose.COSE_KEY_KEY_OPS}, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
+      new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_OPS}, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
       KMCose.COSE_KEY_OP_ENCRYPT, KMCose.COSE_KEY_OP_DECRYPT},
       // Curve
-      new byte[] {KMCose.COSE_KEY_CURVE}, new byte[]{KMCose.COSE_ECCURVE_256},
+      new byte[]{0, 0, 0, KMCose.COSE_KEY_CURVE}, new byte[]{KMCose.COSE_ECCURVE_256},
+      // Test Key
+      KMCose.COSE_TEST_KEY, new byte[]{KMSimpleValue.NULL},
   };
 
-  // TODO comments
-  public static boolean isKeyPairValid(short key, short value) {
+
+  /**
+   * Validates the key and the values corresponding to key.
+   *
+   * @param key    Buffer containing the key.
+   * @param keyOff Offset in the buffer from where key starts.
+   * @param keyLen Length of the key buffer.
+   * @param value  Value corresponding to the key.
+   * @return true if key pair is valid, otherwise false.
+   */
+  public static boolean isKeyPairValid(byte[] key, short keyOff, short keyLen, short value) {
     short index = 0;
     short valueIdx;
     byte[] values;
     boolean valid = false;
     while (index < allowedKeyPairs.length) {
       valueIdx = 0;
-      if (((byte[]) allowedKeyPairs[index])[0] == (byte) key) {
+      if (isEqual((byte[]) allowedKeyPairs[index], (short) 0, (short) ((byte[]) allowedKeyPairs[index]).length,
+          key, keyOff, keyLen)) {
         values = (byte[]) allowedKeyPairs[(short) (index + 1)];
         while (valueIdx < values.length) {
-          if (values[valueIdx] == (byte)value) {
+          if (values[valueIdx] == (byte) value) {
             valid = true;
             break;
           }
@@ -56,26 +83,36 @@ public abstract class KMCoseKeyTypeValue extends KMType {
         }
         break;
       }
-      index += (short)2;
+      index += (short) 2;
     }
     return valid;
   }
 
-  // TODO Comments
-  public static boolean isKeyTypeValid(short keyPtr) {
-    short type = KMType.getType(keyPtr);
-    boolean isValid = false;
-    if (type == INTEGER_TYPE || type == NEG_INTEGER_TYPE) {
-      isValid = true;
-    }
-    return isValid;
+  /**
+   * Compares two key buffers.
+   *
+   * @param key1    First buffer containing the key.
+   * @param offset1 Offset of the first buffer.
+   * @param length1 Length of the first buffer.
+   * @param key2    Second buffer containing the key.
+   * @param offset2 Offset of the second buffer.
+   * @param length2 Length of the second buffer.
+   * @return true if both keys are equal, otherwise false.
+   */
+  private static boolean isEqual(byte[] key1, short offset1, short length1, byte[] key2, short offset2,
+                                 short length2) {
+    if (length1 != length2)
+      return false;
+    return (0 == KMInteger.unsignedByteArrayCompare(key1, offset1, key2, offset2, length1));
   }
 
-  /*
-   * This function returns the key from the key pointer.
-   * Allowed key types are INTEGER_TYPE and NEG_INTEGER_TYPE.
+  /**
+   * Returns the short value of the key.
+   *
+   * @param keyPtr Pointer to either KMInteger or KMNInteger
+   * @return value of the key as short.
    */
-  public static short getKey(short keyPtr) {
+  public static short getKeyValueAsShort(short keyPtr) {
     short type = KMType.getType(keyPtr);
     short value = 0;
     if (type == INTEGER_TYPE) {
@@ -88,24 +125,48 @@ public abstract class KMCoseKeyTypeValue extends KMType {
     return value;
   }
 
-  // TODO Comments
-  public static short getTagValueType(short exp) {
-    short ptr = Util.getShort(heap, (short) (exp + TLV_HEADER_SIZE + 2));
-    short tagValueType = 0;
-    if (BYTE_BLOB_TYPE == KMType.getType(ptr)) {
-      tagValueType = COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE;
-    } else if (INTEGER_TYPE == KMType.getType(ptr)) {
-      tagValueType = COSE_KEY_TAG_INT_VALUE_TYPE;
-    } else if (NEG_INTEGER_TYPE == KMType.getType(ptr)) {
-      tagValueType = COSE_KEY_TAG_NINT_VALUE_TYPE;
+  /**
+   * Returns the key offset from the key pointer.
+   *
+   * @param keyPtr Pointer to either KMInteger or KMNInteger
+   * @return offset from where the key starts.
+   */
+  public static short getKeyStartOffset(short keyPtr) {
+    short type = KMType.getType(keyPtr);
+    short offset = 0;
+    if (type == INTEGER_TYPE) {
+      offset = KMInteger.cast(keyPtr).getStartOff();
+    } else if (type == NEG_INTEGER_TYPE) {
+      offset = KMNInteger.cast(keyPtr).getStartOff();
     } else {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
-    return tagValueType;
+    return offset;
   }
 
+  /**
+   * This function returns one of COSE_KEY_TAG_*_VALUE_TYPE tag
+   * information.
+   *
+   * @param ptr Pointer to one of the KMCoseKey*Value class.
+   * @return Tag value type.
+   */
+  public static short getTagValueType(short ptr) {
+    return Util.getShort(heap, (short) (ptr + TLV_HEADER_SIZE));
+  }
+
+  /**
+   * This function returns the key pointer.
+   *
+   * @return key pointer.
+   */
   public abstract short getKeyPtr();
 
+  /**
+   * This function returns the value pointer.
+   *
+   * @return value pointer.
+   */
   public abstract short getValuePtr();
 
   // TODO validate the values based on the algorithm
