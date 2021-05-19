@@ -117,7 +117,8 @@ public class KMDecoder {
       case KMType.HW_AUTH_TOKEN_TYPE:
         return decodeHwAuthToken(exp);
       case KMType.COSE_KEY_TYPE:
-        return decodeCoseKey(exp);
+      case KMType.COSE_HEADERS_TYPE:
+        return decodeCoseMap(exp);
       case KMType.COSE_KEY_TAG_TYPE:
         short tagValueType = KMCoseKeyTypeValue.getTagValueType(exp);
         return decodeCoseKeyTag(tagValueType, exp);
@@ -206,6 +207,12 @@ public class KMDecoder {
     return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
   }
 
+  private short decodeCoseKeyCoseKeyValue(short exp) {
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyCoseKeyValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeyCoseKeyValue.cast(exp).getValuePtr());
+    return KMCoseKeyCoseKeyValue.instance(keyPtr, valuePtr);
+  }
+
   private short decodeCoseKeyByteBlobValue(short exp) {
     short keyPtr = decodeCoseKeyKeyType((KMCoseKeyByteBlobValue.cast(exp).getKeyPtr()));
     short valuePtr = decode(KMCoseKeyByteBlobValue.cast(exp).getValuePtr());
@@ -242,6 +249,8 @@ public class KMDecoder {
       tagValueType = KMType.COSE_KEY_TAG_INT_VALUE_TYPE;
     } else if (majorType == NEG_INT_TYPE) {
       tagValueType = KMType.COSE_KEY_TAG_NINT_VALUE_TYPE;
+    } else if (majorType == MAP_TYPE) {
+      tagValueType = KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE;
     } else {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
@@ -258,16 +267,18 @@ public class KMDecoder {
         return decodeCoseKeyIntegerValue(exp);
       case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
         return decodeCoseKeySimpleValue(exp);
+      case KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE:
+        return decodeCoseKeyCoseKeyValue(exp);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
     }
   }
 
-  private short decodeCoseKey(short exp) {
+  private short decodeCoseMap(short exp) {
     short payloadLength = readMajorTypeWithPayloadLength(MAP_TYPE);
     // get allowed key pairs
-    short allowedKeyPairs = KMCoseKey.cast(exp).getVals();
+    short allowedKeyPairs = KMCoseMap.getVals(exp);
     short vals = KMArray.instance(payloadLength);
     short length = KMArray.cast(allowedKeyPairs).length();
     short index = 0;
@@ -301,7 +312,7 @@ public class KMDecoder {
         index++;
       }
     }
-    return KMCoseKey.instance(vals);
+    return KMCoseMap.createInstanceFromType(exp, vals);
   }
 
   private short decodeKeyParam(short exp) {

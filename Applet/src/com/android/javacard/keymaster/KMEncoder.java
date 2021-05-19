@@ -173,7 +173,8 @@ public class KMEncoder {
           encodeKeyParam(exp);
           break;
         case KMType.COSE_KEY_TYPE:
-          encodeCoseKey(exp);
+        case KMType.COSE_HEADERS_TYPE:
+          encodeCoseMap(exp);
           break;
         case KMType.KEY_CHAR_TYPE:
           encodeKeyChar(exp);
@@ -276,8 +277,8 @@ public class KMEncoder {
     }
   }
 
-  private void encodeCoseKey(short obj) {
-    encodeAsMap(KMCoseKey.cast(obj).getVals());
+  private void encodeCoseMap(short obj) {
+    encodeAsMap(KMCoseMap.getVals(obj));
   }
 
   private void encodeKeyParam(short obj) {

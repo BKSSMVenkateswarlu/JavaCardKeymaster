@@ -223,7 +223,7 @@ public interface KMSEProvider extends KMUpgradable {
    * This is a oneshot operation that performs key derivation function using cmac kdf (CKDF) as
    * defined in android keymaster hal definition.
    *
-   * @param instance of pre-shared key.
+   * @param hmacKey instance of pre-shared key.
    * @param label is the label to be used for ckdf.
    * @param labelStart is the start of label.
    * @param labelLen is the length of the label.
@@ -272,7 +272,7 @@ public interface KMSEProvider extends KMUpgradable {
    * This is a oneshot operation that signs the data using hmac algorithm. This is used to derive
    * the key, which is used to encrypt the keyblob.
    *
-   * @param instance of masterkey.
+   * @param masterkey instance of masterkey.
    * @param data is the buffer containing data to be signed.
    * @param dataStart is the start of the data.
    * @param dataLength is the length of the data.
@@ -287,6 +287,60 @@ public interface KMSEProvider extends KMUpgradable {
       short dataLength,
       byte[] signature,
       short signatureStart);
+
+  /**
+   * Implementation of HKDF as per RFC5869 https://datatracker.ietf.org/doc/html/rfc5869#section-2
+   *
+   * @param ikm is the buffer containing input key material.
+   * @param ikmOff is the start of the input key.
+   * @param ikmLen is the length of the input key.
+   * @param salt is the buffer containing the salt.
+   * @param saltOff is the start of the salt buffer.
+   * @param saltLen is the length of the salt buffer.
+   * @param info is the buffer containing the application specific information
+   * @param infoOff is the start of the info buffer.
+   * @param infoLen is the length of the info buffer.
+   * @param out is the output buffer.
+   * @param outOff is the start of the output buffer.
+   * @param outLen is the length of the expected out buffer.
+   * @return Length of the out buffer which is outLen.
+   */
+  short hkdf(
+      byte[] ikm,
+      short ikmOff,
+      short ikmLen,
+      byte[] salt,
+      short saltOff,
+      short saltLen,
+      byte[] info,
+      short infoOff,
+      short infoLen,
+      byte[] out,
+      short outOff,
+      short outLen);
+
+  /**
+   * This function performs ECDH key agreement and generates a secret.
+   *
+   * @param privKey is the buffer containing the private key from first party.
+   * @param privKeyOff is the offset of the private key buffer.
+   * @param privKeyLen is the length of the private key buffer.
+   * @param publicKey is the buffer containing the public key from second party.
+   * @param publicKeyOff is the offset of the public key buffer.
+   * @param publicKeyLen is the length of the public key buffer.
+   * @param secret is the output buffer.
+   * @param secretOff is the offset of the output buffer.
+   * @return The length of the secret.
+   */
+  short ecdhKeyAgreement(
+      byte[] privKey,
+      short privKeyOff,
+      short privKeyLen,
+      byte[] publicKey,
+      short publicKeyOff,
+      short publicKeyLen,
+      byte[] secret,
+      short secretOff);
 
   /**
    * This is a oneshot operation that verifies the signature using hmac algorithm.
@@ -347,7 +401,7 @@ public interface KMSEProvider extends KMUpgradable {
   /**
    * This is a oneshot operation that signs the data using EC private key.
    *
-   * @param instance of KMAttestationKey.
+   * @param ecPrivKey instance of KMAttestationKey.
    * @param inputDataBuf is the buffer of the input data.
    * @param inputDataStart is the start of the input data buffer.
    * @param inputDataLength is the length of the inpur data buffer in bytes.

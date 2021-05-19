@@ -39,6 +39,8 @@ public class KMCose {
   public static final short COSE_MAC0_TAG_OFFSET = 3;
   //COSE ENCRYPT
   public static final short COSE_ENCRYPT_ENTRY_COUNT = 4;
+  public static final short COSE_ENCRYPT_STRUCTURE_ENTRY_COUNT = 3;
+  public static final short COSE_ENCRYPT_RECIPIENT_ENTRY_COUNT = 3;
   public static final short COSE_ENCRYPT_PROTECTED_PARAMS_OFFSET = 0;
   public static final short COSE_ENCRYPT_UNPROTECTED_PARAMS_OFFSET = 1;
   public static final short COSE_ENCRYPT_PAYLOAD_OFFSET = 2;
@@ -86,8 +88,15 @@ public class KMCose {
   public static final byte[] COSE_TEST_KEY = {(byte) 0xFF, (byte) 0xFE, (byte) 0xEE, (byte) 0x90}; // -70000
   public static final short COSE_KEY_MAX_SIZE = 4;
 
+  // kdfcontext strings
+  public static final byte[] client = {0x63, 0x6c, 0x69, 0x65, 0x6e, 0x74};
+  public static final byte[] server = {0x73, 0x65, 0x72, 0x76, 0x65, 0x72};
   //Context strings
   public static final byte[] MAC_CONTEXT = {0x4d, 0x41, 0x43, 0x30}; // MAC0
+  public static final byte[] SIGNATURE1_CONTEXT =
+      {0x53, 0x69, 0x67, 0x6E, 0x61, 0x74, 0x75, 0x72, 0x65, 0x31}; // Signature1
+  public static final byte[] ENCRYPT_CONTEXT =
+      {0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74}; // Encrypt
   //Empty strings
   public static final byte[] EMPTY_MAC_KEY =
       {0x45, 0x6d, 0x70, 0x74, 0x79, 0x20, 0x4d, 0x41, 0x43, 0x20, 0x6b, 0x65, 0x79}; // "Empty MAC key"
@@ -124,12 +133,13 @@ public class KMCose {
   /**
    * Constructs the COSE_MAC0 object.
    *
-   * @param protectedHeader Bstr pointer which holds the protected header.
-   * @param payload         Bstr pointer which holds the payload of the MAC structure.
-   * @param tag             Bstr pointer which holds the tag value.
+   * @param protectedHeader   Bstr pointer which holds the protected header.
+   * @param unprotectedHeader Bstr pointer which holds the unprotected header.
+   * @param payload           Bstr pointer which holds the payload of the MAC structure.
+   * @param tag               Bstr pointer which holds the tag value.
    * @return KMArray instance of COSE_MAC0 object.
    */
-  public static short constructCoseMac0(short protectedHeader, short payload, short tag) {
+  public static short constructCoseMac0(short protectedHeader, short unprotectedHeader, short payload, short tag) {
     // Construct Cose_MAC0
     //   COSE_Mac0 = [
     //      protectedHeader,
@@ -141,12 +151,171 @@ public class KMCose {
     // 1 - protected headers
     KMArray.cast(arrPtr).add((short) 0, protectedHeader);
     // 2 - unprotected headers
-    KMArray.cast(arrPtr).add((short) 1, KMMap.instance((short) 0));
+    KMArray.cast(arrPtr).add((short) 1, unprotectedHeader);
     // 2 - payload
     KMArray.cast(arrPtr).add((short) 2, payload);
     // 3 - tag
     KMArray.cast(arrPtr).add((short) 3, tag);
     // Do encode.
+    return arrPtr;
+  }
+
+  /**
+   * Constructs the COSE_Signature structure.
+   *
+   * @param protectedHeader Bstr pointer which holds the protected header.
+   * @param extAad          Bstr pointer which holds the aad.
+   * @param payload         Bstr pointer which holds the payload.
+   * @return KMArray instance of COSE_Signature object.
+   */
+  public static short constructCoseSignStructure(short protectedHeader, short extAad, short payload) {
+    // Sig_structure = [
+    //       context : "Signature" / "Signature1" / "CounterSignature",
+    //       body_protected : empty_or_serialized_map,
+    //       ? sign_protected : empty_or_serialized_map,
+    //       external_aad : bstr,
+    //       payload : bstr
+    //   ]
+    short arrPtr = KMArray.instance(KMCose.COSE_SIGN1_ENTRY_COUNT);
+    // 1 - Context
+    KMArray.cast(arrPtr).add((short) 0, KMTextString.instance(KMCose.SIGNATURE1_CONTEXT, (short) 0,
+        (short) KMCose.SIGNATURE1_CONTEXT.length));
+    // 2 - Protected headers.
+    KMArray.cast(arrPtr).add((short) 1, protectedHeader);
+    // 3 - external aad
+    KMArray.cast(arrPtr).add((short) 2, extAad);
+    // 4 - payload.
+    KMArray.cast(arrPtr).add((short) 3, payload);
+    return arrPtr;
+  }
+
+  /**
+   * Constructs the COSE_Sign1 object.
+   *
+   * @param protectedHeader   Bstr pointer which holds the protected header.
+   * @param unProtectedHeader Bstr pointer which holds the unprotected header.
+   * @param payload           Bstr pointer which holds the payload.
+   * @param signature         Bstr pointer which holds the signature.
+   * @return KMArray instance of COSE_Sign1 object.
+   */
+  public static short constructCoseSign1(short protectedHeader, short unProtectedHeader, short payload,
+                                         short signature) {
+    //   COSE_Sign = [
+    //      protectedHeader,
+    //      unprotectedHeader,
+    //       payload : bstr / nil,
+    //       signatures : [+ COSE_Signature]
+    //   ]
+    short arrPtr = KMArray.instance(KMCose.COSE_SIGN1_ENTRY_COUNT);
+    // 1 - protected headers
+    KMArray.cast(arrPtr).add((short) 0, protectedHeader);
+    // 2 - unprotected headers
+    KMArray.cast(arrPtr).add((short) 1, unProtectedHeader);
+    // 2 - payload
+    KMArray.cast(arrPtr).add((short) 2, payload);
+    // 3 - tag
+    KMArray.cast(arrPtr).add((short) 3, signature);
+    return arrPtr;
+  }
+
+  // TODO Comments
+  private static short constructMap(short[] tags, boolean includeExtraTag) {
+    short index = 0;
+    // var is used to calculate the length of the array.
+    short var = 0;
+    while (index < tags.length) {
+      if (tags[index + 1] != KMType.INVALID_VALUE) {
+        tags[(short) (index + 2)] =
+            buildCoseKeyTagValue((byte) tags[index], tags[(short) (index + 1)]);
+        var++;
+      }
+      index += 3;
+    }
+    if (includeExtraTag) var++;
+    short arrPtr = KMArray.instance(var);
+    index = 0;
+    // var is used to index the array.
+    var = 0;
+    while (index < tags.length) {
+      if (tags[index + 2] != KMType.INVALID_VALUE) {
+        KMArray.cast(arrPtr).add(var++, tags[index + 2]);
+      }
+      index += 3;
+    }
+    return arrPtr;
+  }
+
+  // TODO Comments
+  public static short constructHeaders(short alg, short keyId, short iv, short ephemeralKey) {
+    short[] coseHeaderTags = {
+        KMCose.COSE_LABEL_ALGORITHM, alg, KMType.INVALID_VALUE,
+        KMCose.COSE_LABEL_KEYID, keyId, KMType.INVALID_VALUE,
+        KMCose.COSE_LABEL_IV, iv, KMType.INVALID_VALUE,
+        KMCose.COSE_LABEL_COSE_KEY, ephemeralKey, KMType.INVALID_VALUE
+    };
+    short arrPtr = constructMap(coseHeaderTags, false);
+    return KMCoseHeaders.instance(arrPtr);
+  }
+
+  // TODO Comments
+  public static short constructRecipientsStructure(short protectedHeaders, short unprotectedHeaders,
+                                                   short cipherText) {
+    // recipients : [+COSE_recipient]
+    //  COSE_recipient = [
+    //       Headers,
+    //       ciphertext : bstr / nil,
+    //       ? recipients : [+COSE_recipient]
+    //   ]
+    short arrPtr = KMArray.instance(COSE_ENCRYPT_RECIPIENT_ENTRY_COUNT);
+    // 1 - protected headers
+    KMArray.cast(arrPtr).add((short) 0, protectedHeaders);
+    // 2 - unprotected headers
+    KMArray.cast(arrPtr).add((short) 1, unprotectedHeaders);
+    // 2 - payload
+    KMArray.cast(arrPtr).add((short) 2, cipherText);
+
+    short recipientsArrayPtr = KMArray.instance((short) 1);
+    KMArray.cast(recipientsArrayPtr).add((short) 0, arrPtr);
+    return recipientsArrayPtr;
+  }
+
+  // TODO Comments
+  public static short constructCoseEncryptStructure(short protectedHeader, short aad) {
+    //  Enc_structure = [
+    //       context : "Encrypt" / "Encrypt0" / "Enc_Recipient" /
+    //           "Mac_Recipient" / "Rec_Recipient",
+    //       protected : empty_or_serialized_map,
+    //       external_aad : bstr
+    //   ]
+    short arrPtr = KMArray.instance(COSE_ENCRYPT_STRUCTURE_ENTRY_COUNT);
+    // 1 - protected headers
+    KMArray.cast(arrPtr).add((short) 0, KMTextString.instance(KMCose.ENCRYPT_CONTEXT, (short) 0,
+        (short) KMCose.ENCRYPT_CONTEXT.length));
+    // 2 - unprotected headers
+    KMArray.cast(arrPtr).add((short) 1, protectedHeader);
+    // 2 - payload
+    KMArray.cast(arrPtr).add((short) 2, aad);
+    return arrPtr;
+  }
+
+  // TODO Comments
+  public static short constructCoseEncrypt(short protectedHeader, short unProtectedHeader, short cipherText,
+                                           short recipients) {
+    // COSE_Encrypt = [
+    //      protectedHeader,
+    //      unprotectedHeader,
+    //       ciphertext : bstr / nil,
+    //       recipients : [+COSE_recipient]
+    //   ]
+    short arrPtr = KMArray.instance(KMCose.COSE_ENCRYPT_ENTRY_COUNT);
+    // 1 - protected headers
+    KMArray.cast(arrPtr).add((short) 0, protectedHeader);
+    // 2 - unprotected headers
+    KMArray.cast(arrPtr).add((short) 1, unProtectedHeader);
+    // 2 - payload
+    KMArray.cast(arrPtr).add((short) 2, cipherText);
+    // 3 - tag
+    KMArray.cast(arrPtr).add((short) 3, recipients);
     return arrPtr;
   }
 
@@ -203,36 +372,77 @@ public class KMCose {
         KMCose.COSE_KEY_PUBKEY_X, pubX, KMType.INVALID_VALUE,
         KMCose.COSE_KEY_PUBKEY_Y, pubY, KMType.INVALID_VALUE,
     };
-    short index = 0;
-    // var is used to calculate the length of the array.
-    short var = 0;
-    while (index < coseKeyTags.length) {
-      if (coseKeyTags[index + 1] != KMType.INVALID_VALUE) {
-        coseKeyTags[(short) (index + 2)] =
-            buildCoseKeyTagValue((byte) coseKeyTags[index], coseKeyTags[(short) (index + 1)]);
-        var++;
-      }
-      index += 3;
-    }
-    if (testMode)
-      var++;
-
-    short arrPtr = KMArray.instance(var);
-    index = 0;
-    // var is used to index the array.
-    var = 0;
-    while (index < coseKeyTags.length) {
-      if (coseKeyTags[index + 2] != KMType.INVALID_VALUE) {
-        KMArray.cast(arrPtr).add(var++, coseKeyTags[index + 2]);
-      }
-      index += 3;
-    }
+    // TODO Remove below commented code once the uncommented code works.
+//    short index = 0;
+//    // var is used to calculate the length of the array.
+//    short var = 0;
+//    while (index < coseKeyTags.length) {
+//      if (coseKeyTags[index + 1] != KMType.INVALID_VALUE) {
+//        coseKeyTags[(short) (index + 2)] =
+//            buildCoseKeyTagValue((byte) coseKeyTags[index], coseKeyTags[(short) (index + 1)]);
+//        var++;
+//      }
+//      index += 3;
+//    }
+//    if (testMode)
+//      var++;
+//
+//    short arrPtr = KMArray.instance(var);
+//    index = 0;
+//    // var is used to index the array.
+//    var = 0;
+//    while (index < coseKeyTags.length) {
+//      if (coseKeyTags[index + 2] != KMType.INVALID_VALUE) {
+//        KMArray.cast(arrPtr).add(var++, coseKeyTags[index + 2]);
+//      }
+//      index += 3;
+//    }
+    short arrPtr = constructMap(coseKeyTags, testMode);
     if (testMode) {
       short testKey =
           KMCoseKeySimpleValue.instance(KMNInteger.uint_32(KMCose.COSE_TEST_KEY, (short) 0),
               KMSimpleValue.instance(KMSimpleValue.NULL));
-      KMArray.cast(arrPtr).add(var, testKey);
+      KMArray.cast(arrPtr).add((short) (KMArray.cast(arrPtr).length() - 1), testKey);
     }
     return KMCoseKey.instance(arrPtr);
+  }
+
+  // TODO Comments
+  public static short constructKdfContext(byte[] publicKeyA, short publicKeyAOff, short publicKeyALen,
+                                          byte[] publicKeyB, short publicKeyBOff, short publicKeyBLen,
+                                          boolean senderIsA) {
+    short index = 0;
+    // Prepare sender info
+    short senderInfo = KMArray.instance((short) 3);
+    KMArray.cast(senderInfo).add(index, KMByteBlob.instance(client, (short) 0, (short) client.length));
+    KMArray.cast(senderInfo).add(index++, KMByteBlob.instance((short) 0));
+    KMArray.cast(senderInfo).add(index, senderIsA ?
+        KMByteBlob.instance(publicKeyA, publicKeyAOff, publicKeyALen) :
+        KMByteBlob.instance(publicKeyB, publicKeyBOff, publicKeyBLen));
+
+    // Prepare recipient info
+    index = 0;
+    short recipientInfo = KMArray.instance((short) 3);
+    KMArray.cast(recipientInfo).add(index++, KMByteBlob.instance(server, (short) 0, (short) server.length));
+    KMArray.cast(recipientInfo).add(index++, KMByteBlob.instance((short) 0));
+    KMArray.cast(recipientInfo).add(index, senderIsA ?
+        KMByteBlob.instance(publicKeyB, publicKeyBOff, publicKeyBLen) :
+        KMByteBlob.instance(publicKeyA, publicKeyAOff, publicKeyALen));
+
+    // supply public info
+    index = 0;
+    short publicInfo = KMArray.instance((short) 2);
+    KMArray.cast(publicInfo).add(index++, KMInteger.uint_16(AES_GCM_KEY_SIZE_BITS));
+    KMArray.cast(recipientInfo).add(index, KMByteBlob.instance((short) 0));
+
+    // construct kdf context
+    index = 0;
+    short arrPtr = KMArray.instance((short) 4);
+    KMArray.cast(arrPtr).add(index++, KMInteger.uint_8(COSE_ALG_AES_GCM_256));
+    KMArray.cast(arrPtr).add(index++, senderInfo);
+    KMArray.cast(arrPtr).add(index++, recipientInfo);
+    KMArray.cast(arrPtr).add(index, publicInfo);
+
+    return arrPtr;
   }
 }

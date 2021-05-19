@@ -20,7 +20,7 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
-public class KMCoseKey extends KMType {
+public class KMCoseKey extends KMCoseMap {
 
   private static KMCoseKey prototype;
 
@@ -62,10 +62,12 @@ public class KMCoseKey extends KMType {
     return proto(ptr);
   }
 
+  @Override
   public short getVals() {
     return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_OFFSET] + TLV_HEADER_SIZE));
   }
 
+  @Override
   public short length() {
     short arrPtr = getVals();
     return KMArray.cast(arrPtr).length();

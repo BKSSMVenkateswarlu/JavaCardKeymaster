@@ -26,7 +26,9 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
 
   public static final byte[] keys = {
     KMCose.COSE_KEY_PUBKEY_X,
-    KMCose.COSE_KEY_PUBKEY_Y
+    KMCose.COSE_KEY_PUBKEY_Y,
+    KMCose.COSE_LABEL_IV,
+    KMCose.COSE_LABEL_KEYID,
   };
 
   private KMCoseKeyByteBlobValue() {

@@ -41,15 +41,18 @@ public abstract class KMCoseKeyTypeValue extends KMType {
       // Key type
       new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_TYPE}, new byte[]{KMCose.COSE_KEY_TYPE_EC2,
       KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
-      // Algorithm
+      // Key Algorithm
       new byte[]{0, 0, 0, KMCose.COSE_KEY_ALGORITHM},
       new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
           KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
       // Key operations
       new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_OPS}, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
       KMCose.COSE_KEY_OP_ENCRYPT, KMCose.COSE_KEY_OP_DECRYPT},
-      // Curve
+      // Key Curve
       new byte[]{0, 0, 0, KMCose.COSE_KEY_CURVE}, new byte[]{KMCose.COSE_ECCURVE_256},
+      // Header Label Algorithm
+      new byte[]{0, 0, 0, KMCose.COSE_LABEL_ALGORITHM}, new byte[]{KMCose.COSE_ALG_AES_GCM_256,
+      KMCose.COSE_ALG_HMAC_256, KMCose.COSE_ALG_ES256, KMCose.COSE_ALG_ECDH_ES_HKDF_256},
       // Test Key
       KMCose.COSE_TEST_KEY, new byte[]{KMSimpleValue.NULL},
   };
@@ -81,7 +84,8 @@ public abstract class KMCoseKeyTypeValue extends KMType {
           }
           valueIdx++;
         }
-        break;
+        if (valid)
+          break;
       }
       index += (short) 2;
     }
