@@ -3954,9 +3954,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
             testMode);
     // Encode the cose key and make it as payload.
     tmpVariables[1] = encoder.encode(coseKey, scratchPad, (short) 0);
-    short payload = KMByteBlob.instance(tmpVariables[1]);
-    Util.arrayCopyNonAtomic(scratchPad, (short) 0, KMByteBlob.cast(payload).getBuffer(),
-        KMByteBlob.cast(payload).getStartOff(), tmpVariables[1]);
+    short payload = KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[1]);
     // Get the mackey.
     short macKey = KMByteBlob.instance((short) 32);
     if (testMode) {
@@ -3966,10 +3964,6 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
       // TODO get the key from persistent memory and copy to tmpVariables[1] offset.
     }
     // Prepare protected header, which is required to construct the COSE_MAC0
-//    short mapPtr = KMMap.instance((short) 1);
-//    KMMap.cast(mapPtr).add((short) 0, KMInteger.uint_8(KMCose.COSE_LABEL_ALGORITHM),
-//        KMInteger.uint_8(KMCose.COSE_ALG_HMAC_256));
-//    KMMap.cast(mapPtr).canonicalize();
     short headerPtr = KMCose.constructHeaders(
         KMInteger.uint_8(KMCose.COSE_ALG_HMAC_256),
         KMType.INVALID_VALUE,

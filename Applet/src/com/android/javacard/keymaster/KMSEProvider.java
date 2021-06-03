@@ -441,6 +441,8 @@ public interface KMSEProvider extends KMUpgradable {
       short outputDataStart);
 
   /**
+   * This is a oneshort operation that verifies the data using EC public key
+   *
    * @param pubKey             is the public key buffer.
    * @param pubKeyOffset       is the start of the public key buffer.
    * @param pubKeyLen          is the length of the public key.

@@ -1428,6 +1428,7 @@ public class KMFunctionalTest {
   @Test
   public void testRkpGeneratedEcdsaKeyPair() {
     init();
+    // Running this test case in test mode.
     byte[] testHmacKey = new byte[32];
     short ret = generateRkpEcdsaKeyPair();
     // Decode CoseMac0
@@ -1445,16 +1446,10 @@ public class KMFunctionalTest {
     short bstrProtectedHptr = KMArray.cast(ret).get((short) 0);
     short unprotectedHptr = KMArray.cast(ret).get((short) 1);
     // Verify algorithm inside protected header.
-    //arrPtr = KMArray.instance((short) 1);
     arrPtr = KMCoseHeaders.exp();//KMMap.instance((short) 1);
-    //KMMap.cast(arrPtr).add((short) 0, KMInteger.exp(), KMInteger.exp());
     ret = decoder.decode(arrPtr, KMByteBlob.cast(bstrProtectedHptr).getBuffer(),
         KMByteBlob.cast(bstrProtectedHptr).getStartOff(), KMByteBlob.cast(bstrProtectedHptr).length());
-    short algPtr = KMArray.cast(KMCoseHeaders.cast(ret).getVals()).get((short) 0);
-    short alg = KMInteger.cast(KMCoseKeyIntegerValue.cast(algPtr).getKeyPtr()).getShort();
-    short algVal = KMInteger.cast(KMCoseKeyIntegerValue.cast(algPtr).getValuePtr()).getShort();
-    Assert.assertEquals(alg, KMCose.COSE_LABEL_ALGORITHM);
-    Assert.assertEquals(algVal, KMCose.COSE_ALG_HMAC_256);
+    Assert.assertTrue(KMCoseHeaders.cast(ret).isDataValid(KMCose.COSE_ALG_HMAC_256, KMType.INVALID_VALUE));
     // Verify that unprotected header length is 0.
     Assert.assertEquals(0, KMCoseHeaders.cast(unprotectedHptr).length());
     // Generate Cose_Mac0 structure and verify the tag.
