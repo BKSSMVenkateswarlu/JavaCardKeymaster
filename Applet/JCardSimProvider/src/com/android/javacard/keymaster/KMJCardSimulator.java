@@ -1249,6 +1249,33 @@ public class KMJCardSimulator implements KMSEProvider {
   }
 
   @Override
+  public short ecSign256(byte[] privBuf, short privBufStart, short privBufLen, byte[] inputDataBuf, short inputDataStart,
+                         short inputDataLength, byte[] outputDataBuf, short outputDataStart) {
+    ECPrivateKey key = createEcKey(privBuf, privBufStart, privBufLen);
+    Signature signer = Signature
+        .getInstance(Signature.ALG_ECDSA_SHA_256, false);
+    signer.init(key, Signature.MODE_SIGN);
+    return signer.sign(inputDataBuf, inputDataStart, inputDataLength,
+        outputDataBuf, outputDataStart);
+  }
+
+  @Override
+  public boolean ecVerify256(byte[] pubKey, short pubKeyOffset, short pubKeyLen, byte[] inputDataBuf,
+                           short inputDataStart, short inputDataLength, byte[] signatureDataBuf,
+                           short signatureDataStart, short signatureDataLen) {
+
+    KeyPair ecKeyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
+    ECPublicKey ecPublicKey = (ECPublicKey) ecKeyPair.getPublic();
+    ecPublicKey.setW(pubKey, pubKeyOffset, pubKeyLen);
+
+    Signature signer = Signature
+        .getInstance(Signature.ALG_ECDSA_SHA_256, false);
+    signer.init(ecPublicKey, Signature.MODE_VERIFY);
+    return signer.verify(inputDataBuf, inputDataStart, inputDataLength,
+        signatureDataBuf, signatureDataStart, signatureDataLen);
+  }
+
+  @Override
   public void clearCertificateChain() {
     JCSystem.beginTransaction();
     Util.arrayFillNonAtomic(certificateChain, (short) 0, CERT_CHAIN_MAX_SIZE, (byte) 0);

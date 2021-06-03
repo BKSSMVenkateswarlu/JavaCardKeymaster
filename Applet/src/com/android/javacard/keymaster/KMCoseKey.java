@@ -20,6 +20,12 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
+/**
+ * KMCoseKey represents COSE_Key section from the Cose standard https://datatracker.ietf.org/doc/html/rfc8152#section-7
+ * The supported key types are KMNInteger, KMInteger and the supported value types are KMInteger, KMNInteger,
+ * KMByteBlob, KMSimpleValue. It corresponds to a CBOR Map type.  struct{byte TAG_TYPE; short length; short arrayPtr }
+ * where arrayPtr is a pointer to array with any KMTag subtype instances.
+ */
 public class KMCoseKey extends KMCoseMap {
 
   private static KMCoseKey prototype;
@@ -36,11 +42,12 @@ public class KMCoseKey extends KMCoseMap {
   }
 
   public static short exp() {
-    short arrPtr = KMArray.instance((short) 3);
+    short arrPtr = KMArray.instance((short) 4);
     KMArray arr = KMArray.cast(arrPtr);
     arr.add((short) 0, KMCoseKeyIntegerValue.exp());
     arr.add((short) 1, KMCoseKeyNIntegerValue.exp());
     arr.add((short) 2, KMCoseKeyByteBlobValue.exp());
+    arr.add((short) 3, KMCoseKeySimpleValue.exp());
     return KMCoseKey.instance(arrPtr);
   }
 
@@ -71,6 +78,144 @@ public class KMCoseKey extends KMCoseMap {
   public short length() {
     short arrPtr = getVals();
     return KMArray.cast(arrPtr).length();
+  }
+
+  private short getValueType(short key, short significantKey) {
+    short arr = getVals();
+    short length = length();
+    short keyPtr;
+    short valPtr = 0;
+    short index = 0;
+    short tagType;
+    boolean found = false;
+    while (index < length) {
+      tagType = KMCoseKeyTypeValue.getTagValueType(KMArray.cast(arr).get(index));
+      switch (tagType) {
+        case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
+          keyPtr = KMCoseKeyByteBlobValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
+            valPtr = KMCoseKeyByteBlobValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+            found = true;
+          }
+          break;
+        case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
+          keyPtr = KMCoseKeyIntegerValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
+            valPtr = KMCoseKeyIntegerValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+            found = true;
+          }
+          break;
+        case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
+          keyPtr = KMCoseKeyNIntegerValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
+            valPtr = KMCoseKeyNIntegerValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+            found = true;
+          }
+          break;
+        case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
+          keyPtr = KMCoseKeySimpleValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == KMCoseKeyTypeValue.getKeyValueShort(keyPtr) &&
+              significantKey == KMCoseKeyTypeValue.getKeyValueSignificantShort(keyPtr)) {
+            valPtr = KMCoseKeySimpleValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+            found = true;
+          }
+          break;
+        default:
+          break;
+
+      }
+      if (found)
+        break;
+      index++;
+    }
+    return valPtr;
+  }
+
+  public short getKeyIdentifier() {
+    return getValueType(KMCose.COSE_KEY_KEY_ID, KMType.INVALID_VALUE);
+  }
+
+  public short getEcdsa256PublicKey(byte[] pubKey, short pubKeyOff) {
+    short baseOffset = pubKeyOff;
+    pubKey[pubKeyOff] = (byte) 0x04; // uncompressed.
+    pubKeyOff++;
+    short ptr = getValueType(KMCose.COSE_KEY_PUBKEY_X, KMType.INVALID_VALUE);
+    Util.arrayCopy(KMByteBlob.cast(ptr).getBuffer(), KMByteBlob.cast(ptr).getStartOff(),
+        pubKey, pubKeyOff, KMByteBlob.cast(ptr).length());
+    pubKeyOff += KMByteBlob.cast(ptr).length();
+    ptr = getValueType(KMCose.COSE_KEY_PUBKEY_Y, KMType.INVALID_VALUE);
+    Util.arrayCopy(KMByteBlob.cast(ptr).getBuffer(), KMByteBlob.cast(ptr).getStartOff(),
+        pubKey, pubKeyOff, KMByteBlob.cast(ptr).length());
+    pubKeyOff += KMByteBlob.cast(ptr).length();
+    return (short) (pubKeyOff - baseOffset);
+  }
+
+
+  public boolean isTestKey() {
+    short ptr =
+        getValueType(
+            Util.getShort(KMCose.COSE_TEST_KEY, (short) 2), // LSB
+            Util.getShort(KMCose.COSE_TEST_KEY, (short) 0) // MSB (Significant)
+        );
+    return KMSimpleValue.cast(ptr).getValue() == KMSimpleValue.NULL;
+  }
+
+  /**
+   * Verifies the KMCoseKey values against the input values.
+   *
+   * @param keyType  value of the key type
+   * @param keyIdPtr instance of KMByteBlob containing the key id.
+   * @param keyAlg   value of the algorithm.
+   * @param keyOps   value of the key operations.
+   * @param curve    value of the curve.
+   * @return true if valid, otherwise false.
+   */
+  public boolean isDataValid(short keyType, short keyIdPtr, short keyAlg, short keyOps, short curve) {
+    short[] coseKeyTags = {
+        KMCose.COSE_KEY_KEY_TYPE, keyType,
+        KMCose.COSE_KEY_KEY_ID, keyIdPtr,
+        KMCose.COSE_KEY_ALGORITHM, keyAlg,
+        KMCose.COSE_KEY_KEY_OPS, keyOps,
+        KMCose.COSE_KEY_CURVE, curve,
+    };
+    boolean valid = false;
+    short ptr;
+    short tagIndex = 0;
+    short value;
+    while (tagIndex < coseKeyTags.length) {
+      value = coseKeyTags[(short) (tagIndex + 1)];
+      if (value != KMType.INVALID_VALUE) {
+        valid = false;
+        ptr = getValueType(coseKeyTags[tagIndex], KMType.INVALID_VALUE);
+        switch (KMType.getType(ptr)) {
+          case KMType.BYTE_BLOB_TYPE:
+            if ((KMByteBlob.cast(value).length() == KMByteBlob.cast(ptr).length()) &&
+                (0 ==
+                    Util.arrayCompare(KMByteBlob.cast(value).getBuffer(),
+                        KMByteBlob.cast(value).getStartOff(),
+                        KMByteBlob.cast(ptr).getBuffer(),
+                        KMByteBlob.cast(ptr).getStartOff(),
+                        KMByteBlob.cast(ptr).length()))) {
+              valid = true;
+            }
+            break;
+          case KMType.INTEGER_TYPE:
+            if (value == KMInteger.cast(ptr).getShort()) {
+              valid = true;
+            }
+            break;
+          case KMType.NEG_INTEGER_TYPE:
+            if ((byte) value == (byte) KMNInteger.cast(ptr).getShort()) {
+              valid = true;
+            }
+            break;
+        }
+        if (!valid)
+          break;
+      }
+      tagIndex += 2;
+    }
+    return valid;
   }
 
   public void canonicalize() {

@@ -130,7 +130,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   private static final byte PROVISION_STATUS_PROVISIONING_LOCKED = 0x40;
 
   // Data Dictionary items
-  public static final byte DATA_ARRAY_SIZE = 30;
+  public static final byte DATA_ARRAY_SIZE = 32;
   public static final byte TMP_VARIABLE_ARRAY_SIZE = 20;
   public static final byte UPDATE_PARAM_ARRAY_SIZE = 40;
   public static final byte KEY_PARAMETERS = 0;
@@ -162,6 +162,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   public static final byte HW_TOKEN = 26;
   public static final byte VERIFICATION_TOKEN = 27;
   public static final byte SIGNATURE = 28;
+  public static final byte BCC = 29;
 
   // AddRngEntropy
   protected static final short MAX_SEED_SIZE = 2048;
@@ -181,6 +182,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   // Buffer constants.
   private static final short BUF_START_OFFSET = 0;
   private static final short BUF_LEN_OFFSET = 2;
+  private static final short EPHEMERAL_MAC_KEY_SIZE = 32;
 
   // Keymaster Applet attributes
   protected static byte keymasterState = ILLEGAL_STATE;
@@ -3319,17 +3321,483 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     return KMKeyParameters.instance(arrPtr);
   }
 
+  private static short validateAndExtractEekPub(boolean testMode, byte[] eekChain, short eekChainOffset,
+                                                short eekChainLen, byte[] scratchPad,
+                                                short offset) {
+    short ret = KMArray.instance(eekChain[eekChainOffset]);
+    short ptr = KMArray.instance(eekChain[eekChainOffset]);
+    short index = 0;
+    // prepare exp for KMCoseHeaders
+    short coseHeadersExp = KMCoseHeaders.exp();
+    // prepare exp for COSE_Sign1
+    short innerArrptr = KMArray.instance((short) 4);
+    KMArray.cast(innerArrptr).add((short) 0, KMByteBlob.exp());
+    KMArray.cast(innerArrptr).add((short) 1, coseHeadersExp);
+    KMArray.cast(innerArrptr).add((short) 2, KMByteBlob.exp());
+    KMArray.cast(innerArrptr).add((short) 3, KMByteBlob.exp());
+    while (index < eekChain[eekChainOffset]) {
+      KMArray.cast(ptr).add(index++, innerArrptr);
+    }
+    boolean isTestKey;
+    short arr = decoder.decode(ptr, eekChain, (short) (eekChainOffset + 1), (short) (eekChainOffset - 1));
+    short len = KMArray.cast(arr).length();
+    //prepare exp for coseky
+    short coseKeyExp = KMCoseKey.exp();
+    short ptr1;
+    short ptr2;
+    short signStructure;
+    short encodedLen;
+    short lastCoseKey = 0;
+    short keySize;
+    short alg = KMCose.COSE_ALG_ES256;
+    for (index = 0; index < len; index++) {
+      ptr1 = KMArray.cast(arr).get(index);
+
+      // validate protected Headers
+      ptr2 = KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PROTECTED_PARAMS_OFFSET);
+      ptr2 = decoder.decode(coseHeadersExp, KMByteBlob.cast(ptr2).getBuffer(),
+          KMByteBlob.cast(ptr2).getStartOff(), KMByteBlob.cast(ptr2).length());
+      if (!KMCoseHeaders.cast(ptr2).isDataValid(KMCose.COSE_ALG_ES256, KMType.INVALID_VALUE))
+        KMException.throwIt(KMError.STATUS_FAILED);
+
+      // parse and get the public key from payload.
+      ptr2 = KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PAYLOAD_OFFSET);
+      ptr2 = decoder.decode(coseKeyExp, KMByteBlob.cast(ptr2).getBuffer(),
+          KMByteBlob.cast(ptr2).getStartOff(), KMByteBlob.cast(ptr2).length());
+      if (index == len - 1) {
+        alg = KMCose.COSE_ALG_ECDH_ES_HKDF_256;
+      }
+      if (!KMCoseKey.cast(ptr2).isDataValid(KMCose.COSE_KEY_TYPE_EC2, KMType.INVALID_VALUE, alg,
+          KMType.INVALID_VALUE, KMCose.COSE_ECCURVE_256))
+        KMException.throwIt(KMError.STATUS_FAILED);
+      if (lastCoseKey == 0)
+        lastCoseKey = ptr2;
+      if (testMode) {
+        // Validate signature.
+        keySize = KMCoseKey.cast(lastCoseKey).getEcdsa256PublicKey(scratchPad, offset);
+        if (keySize != 65) {
+          KMException.throwIt(KMError.STATUS_FAILED);
+        }
+        signStructure =
+            KMCose.constructCoseSignStructure(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PROTECTED_PARAMS_OFFSET),
+                KMByteBlob.instance((short) 0),
+                KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PAYLOAD_OFFSET));
+        encodedLen = encoder.encode(signStructure, scratchPad, (short) (offset + keySize));
+
+        if (!seProvider.ecVerify256(scratchPad, offset, keySize, scratchPad, (short) (offset + keySize), encodedLen,
+            KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).getBuffer(),
+            KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).getStartOff(),
+            KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).length())) {
+          KMException.throwIt(KMError.STATUS_FAILED);
+        }
+        // Verify the public key
+        if (index == 0) {
+          // TODO match the public key with the hard-coded public key.
+        }
+      }
+      lastCoseKey = ptr2;
+    }
+    return lastCoseKey;
+  }
+
+  private static short validateAndExtractPublicKeys(boolean testMode, byte[] macedPubKeys, short macedPubKeysOff,
+                                                    short macedPubKeysLen, byte[] scratchPad,
+                                                    short offset) {
+    short ret = KMArray.instance(macedPubKeys[macedPubKeysOff]);
+    short ptr = KMArray.instance(macedPubKeys[macedPubKeysOff]);
+    short index = 0;
+    while (index < macedPubKeys[macedPubKeysOff]) {
+      KMArray.cast(ptr).add(index++, KMByteBlob.exp());
+    }
+    boolean isTestKey;
+    short arr = decoder.decode(ptr, macedPubKeys, (short) (macedPubKeysOff + 1), (short) (macedPubKeysLen - 1));
+    short len = KMArray.cast(arr).length();
+    // prepare exp for KMCoseHeaders
+    short coseHeadersExp = KMCoseHeaders.exp();
+    //prepare exp for coseky
+    short coseKeyExp = KMCoseKey.exp();
+    // prepare exp for COSE_Mac0
+    ptr = KMArray.instance((short) 4);
+    KMArray.cast(ptr).add((short) 0, KMByteBlob.exp());
+    KMArray.cast(ptr).add((short) 1, coseHeadersExp);
+    KMArray.cast(ptr).add((short) 2, KMByteBlob.exp());
+    KMArray.cast(ptr).add((short) 3, KMByteBlob.exp());
+    short ptr1;
+    short ptr2;
+    short macStructure;
+    short encodedLen;
+    short hmacLen;
+    // Get the mackey.
+    short macKey = KMByteBlob.instance((short) 32);
+    if (testMode) {
+      Util.arrayFillNonAtomic(KMByteBlob.cast(macKey).getBuffer(),
+          KMByteBlob.cast(macKey).getStartOff(), (short) 32, (byte) 0);
+    } else {
+      // TODO get the key from persistent memory and copy to tmpVariables[1] offset.
+    }
+    for (index = 0; index < len; index++) {
+      ptr1 = KMArray.cast(arr).get(index);
+
+      //Decode Cose_Mac0
+      ptr2 = decoder.decode(ptr, KMByteBlob.cast(ptr1).getBuffer(), KMByteBlob.cast(ptr1).getStartOff(),
+          KMByteBlob.cast(ptr1).length());
+
+      // validate protected Headers
+      ptr1 = KMArray.cast(ptr2).get(KMCose.COSE_MAC0_PROTECTED_PARAMS_OFFSET);
+      ptr1 = decoder.decode(coseHeadersExp, KMByteBlob.cast(ptr1).getBuffer(),
+          KMByteBlob.cast(ptr1).getStartOff(), KMByteBlob.cast(ptr1).length());
+      if (!KMCoseHeaders.cast(ptr1).isDataValid(KMCose.COSE_ALG_HMAC_256, KMType.INVALID_VALUE))
+        KMException.throwIt(KMError.STATUS_FAILED);
+
+      // Validate payload.
+      ptr1 = KMArray.cast(ptr2).get(KMCose.COSE_MAC0_PAYLOAD_OFFSET);
+      ptr1 = decoder.decode(coseKeyExp, KMByteBlob.cast(ptr1).getBuffer(),
+          KMByteBlob.cast(ptr1).getStartOff(), KMByteBlob.cast(ptr1).length());
+      if (!KMCoseKey.cast(ptr1).isDataValid(KMCose.COSE_KEY_TYPE_EC2, KMType.INVALID_VALUE, KMCose.COSE_ALG_ES256,
+          KMType.INVALID_VALUE, KMCose.COSE_ECCURVE_256))
+        KMException.throwIt(KMError.STATUS_FAILED);
+      isTestKey = KMCoseKey.cast(ptr1).isTestKey();
+      if (isTestKey && !testMode) {
+        KMException.throwIt(KMError.STATUS_TEST_KEY_IN_PRODUCTION_REQUEST);
+      } else if (!isTestKey && testMode) {
+        KMException.throwIt(KMError.STATUS_PRODUCTION_KEY_IN_TEST_REQUEST);
+      }
+      // Add cosekey to the ret array.
+      KMArray.cast(ret).add(index, ptr1);
+
+      // compare tag
+      macStructure =
+          KMCose.constructCoseMacStructure(KMArray.cast(ptr2).get(KMCose.COSE_MAC0_PROTECTED_PARAMS_OFFSET),
+              KMByteBlob.instance((short) 0),
+              KMArray.cast(ptr2).get(KMCose.COSE_MAC0_PAYLOAD_OFFSET));
+      encodedLen = encoder.encode(macStructure, scratchPad, offset);
+      hmacLen = seProvider.hmacSign(KMByteBlob.cast(macKey).getBuffer(), KMByteBlob.cast(macKey).getStartOff(),
+          (short) 32, scratchPad, offset, encodedLen, scratchPad, (short) (offset + encodedLen));
+
+      if (hmacLen != KMByteBlob.cast(KMArray.cast(ptr2).get(KMCose.COSE_MAC0_TAG_OFFSET)).length())
+        KMException.throwIt(KMError.STATUS_INVALID_MAC);
+
+      if (0 != Util.arrayCompare(scratchPad, (short) (offset + encodedLen),
+          KMByteBlob.cast(KMArray.cast(ptr2).get(KMCose.COSE_MAC0_TAG_OFFSET)).getBuffer(),
+          KMByteBlob.cast(KMArray.cast(ptr2).get(KMCose.COSE_MAC0_TAG_OFFSET)).getStartOff(),
+          hmacLen)) {
+        KMException.throwIt(KMError.STATUS_INVALID_MAC);
+      }
+    }
+    return ret;
+  }
+
+  private static short constructCoseKey(short keyType, short keyId, short keyAlg, short keyOps, short curve,
+                                        byte[] pubKey, short pubKeyOff, short pubKeyLen, boolean testMode) {
+    if (pubKey[pubKeyOff] == 0x04) { // uncompressed format
+      pubKeyOff += 1;
+      pubKeyLen -= 1;
+    }
+    pubKeyLen = (short) (pubKeyLen / 2);
+    short xPtr = KMByteBlob.instance(pubKey, pubKeyOff, pubKeyLen);
+    short yPtr = KMByteBlob.instance(pubKey, (short) (pubKeyOff + pubKeyLen), pubKeyLen);
+    short coseKey = KMCose.constructCoseKey(keyType, keyId, keyAlg, keyOps, curve, xPtr, yPtr, testMode);
+    KMCoseKey.cast(coseKey).canonicalize();
+    return coseKey;
+  }
+
+  // BCC = [ Cose_Key, Cose_Sign1, Cose_Sign2 ...]
+  private static void generateBcc(byte[] scratchPad, short offset, short tmpVarOff) {
+    short[] lengths = {tmpVariables[tmpVarOff], tmpVariables[(short) (tmpVarOff + 1)]};
+    seProvider.createAsymmetricKey(
+        KMType.EC,
+        scratchPad,
+        offset,
+        (short) 128,
+        scratchPad,
+        (short) (offset + 128),
+        (short) 128,
+        lengths);
+    data[SECRET] = KMByteBlob.instance(scratchPad, offset, lengths[0]);
+    short coseKey =
+        constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMInteger.uint_8(KMCose.COSE_KEY_OP_VERIFY),
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            scratchPad,
+            (short) (offset + 128),
+            lengths[1],
+            false
+        );
+
+    // lengths[1] temporarily holds the length of encoded coseKey.
+    lengths[(short) 1] = encoder.encode(coseKey, scratchPad, offset);
+    // Construct payload.
+    short payload =
+        KMCose.constructCoseCertPayload(
+            KMCoseKeyTextStringValue.instance(KMInteger.uint_8(KMCose.ISSUER),
+                KMTextString.instance(KMCose.TEST_ISSUER_NAME, (short) 0, (short) KMCose.TEST_ISSUER_NAME.length)),
+            KMCoseKeyTextStringValue.instance(KMInteger.uint_8(KMCose.SUBJECT),
+                KMTextString.instance(KMCose.TEST_SUBJECT_NAME, (short) 0, (short) KMCose.TEST_SUBJECT_NAME.length)),
+            KMCoseKeyByteBlobValue.instance(KMNInteger.uint_32(KMCose.SUBJECT_PUBLIC_KEY, (short) 0),
+                KMByteBlob.instance(scratchPad, offset, lengths[(short) 1])),
+            KMCoseKeyByteBlobValue.instance(KMNInteger.uint_32(KMCose.KEY_USAGE, (short) 0),
+                KMByteBlob.instance(KMCose.KEY_USAGE_SIGN, (short) 0, (short) KMCose.KEY_USAGE_SIGN.length))
+        );
+    // lengths[1] temporarily holds the length of encoded cert payload.
+    lengths[(short) 1] = encoder.encode(payload, scratchPad, offset);
+    payload = KMByteBlob.instance(scratchPad, offset, lengths[(short) 1]);
+
+    // protected header
+    short protectedHeader =
+        KMCose.constructHeaders(KMNInteger.uint_8(KMCose.COSE_ALG_ES256), KMType.INVALID_VALUE,
+            KMType.INVALID_VALUE, KMType.INVALID_VALUE);
+    // lengths[1] temporarily holds the length of encoded headers.
+    lengths[(short) 1] = encoder.encode(protectedHeader, scratchPad, offset);
+    protectedHeader = KMByteBlob.instance(scratchPad, offset, lengths[(short) 1]);
+
+    //unprotected headers.
+    short arr = KMArray.instance((short) 0);
+    short unprotectedHeader = KMCoseHeaders.instance(arr);
+
+    // construct cose sign structure.
+    short coseSignStructure =
+        KMCose.constructCoseSignStructure(protectedHeader, KMByteBlob.instance((short) 0), payload);
+    // lengths[1] temporarily holds the length of encoded sign structure.
+    // Encode cose Sign_Structure.
+    lengths[(short) 1] = encoder.encode(coseSignStructure, scratchPad, offset);
+    // do sign
+    lengths[(short) 0] =
+        seProvider.ecSign256(
+            KMByteBlob.cast(data[SECRET]).getBuffer(),
+            KMByteBlob.cast(data[SECRET]).getStartOff(),
+            KMByteBlob.cast(data[SECRET]).length(),
+            scratchPad,
+            offset,
+            lengths[(short) 1],
+            scratchPad,
+            (short) (offset + lengths[(short) 1])
+        );
+    coseSignStructure = KMByteBlob.instance(scratchPad, (short) (offset + lengths[(short) 1]), lengths[(short) 0]);
+
+    // construct cose_sign1
+    short coseSign1 =
+        KMCose.constructCoseSign1(protectedHeader, unprotectedHeader, payload, coseSignStructure);
+
+    // [Cose_Key, Cose_Sign1]
+    data[BCC] = KMArray.instance((short) 2);
+    KMArray.cast(data[BCC]).add((short) 0, coseKey);
+    KMArray.cast(data[BCC]).add((short) 1, coseSign1);
+  }
+
+  /**
+   * This function constructs a Mac Structure, encode it and signs the encoded buffer with the
+   * ephemeral mac key.
+   */
+  private static short constructPubKeysToSignMac(byte[] scratchPad, short offset, byte[] ephemeralKey,
+                                                 short ephemeralKeyOff, short ephemeralKeyLen, short pubKeysToSign) {
+    short ptr;
+    short len;
+    short headerPtr = KMCose.constructHeaders(
+        KMInteger.uint_8(KMCose.COSE_ALG_HMAC_256),
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE);
+    // Encode the protected header as byte blob.
+    len = encoder.encode(headerPtr, scratchPad, offset);
+    short protectedHeader = KMByteBlob.instance(scratchPad, offset, len);
+    // create MAC_Structure
+    ptr =
+        KMCose.constructCoseMacStructure(protectedHeader, KMByteBlob.instance((short) 0), pubKeysToSign);
+    // Encode the Mac_structure and do HMAC_Sign to produce the tag for COSE_MAC0
+    len = encoder.encode(ptr, scratchPad, offset);
+    ptr =
+        seProvider.hmacSign(
+            ephemeralKey,
+            ephemeralKeyOff,
+            ephemeralKeyLen,
+            scratchPad,
+            offset,
+            len,
+            scratchPad,
+            (short) (offset + len) // offset
+        );
+    return KMByteBlob.instance(scratchPad, (short) (offset + len), ptr);
+  }
+
+  private static short createDeviceInfo() {
+    // TODO
+    return KMMap.instance((short) 0);
+  }
+
+  private static short createSignedMac(byte[] scratchPad, short offset, short ephmeralMacKey, short challengePtr,
+                                       short deviceMapPtr) {
+    /* Prepare AAD */
+    short aad = KMArray.instance((short) 2);
+    KMArray.cast(aad).add((short) 0, challengePtr);
+    KMArray.cast(aad).add((short) 1, deviceMapPtr);
+    aad = encoder.encode(aad, scratchPad, offset);
+    aad = KMByteBlob.instance(scratchPad, offset, aad);
+
+    /* construct protected header */
+    short protectedHeaders = KMCose.constructHeaders(
+        KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE);
+    protectedHeaders = encoder.encode(protectedHeaders, scratchPad, offset);
+    protectedHeaders = KMByteBlob.instance(scratchPad, offset, protectedHeaders);
+
+    /* construct cose sign structure */
+    short signStructure =
+        KMCose.constructCoseSignStructure(protectedHeaders, aad, ephmeralMacKey);
+    signStructure = encoder.encode(signStructure, scratchPad, offset);
+    short len =
+        seProvider.ecSign256(
+            KMByteBlob.cast(data[SECRET]).getBuffer(),
+            KMByteBlob.cast(data[SECRET]).getStartOff(),
+            KMByteBlob.cast(data[SECRET]).length(),
+            scratchPad,
+            offset,
+            signStructure,
+            scratchPad,
+            (short) (offset + signStructure)
+        );
+    signStructure = KMByteBlob.instance(scratchPad, (short) (offset + signStructure), len);
+
+    /* Construct unprotected headers */
+    short unprotectedHeader = KMArray.instance((short) 0);
+    unprotectedHeader = KMCoseHeaders.instance(unprotectedHeader);
+
+    /* construct Cose_Sign1 */
+    return KMCose.constructCoseSign1(protectedHeaders, unprotectedHeader, ephmeralMacKey, signStructure);
+  }
+
+  private static short ecdhHkdfDeriveKey(byte[] privKeyA, short privKeyAOff, short privKeyALen, byte[] pubKeyA,
+                                         short pubKeyAOff, short pubKeyALen, byte[] pubKeyB, short pubKeyBOff,
+                                         short pubKeyBLen, byte[] scratchPad, short offset) {
+    short key =
+        seProvider.ecdhKeyAgreement(privKeyA, privKeyAOff, privKeyALen, pubKeyB, pubKeyBOff,
+            pubKeyBLen, scratchPad, offset);
+    key = KMByteBlob.instance(scratchPad, offset, key);
+
+    short kdfContext =
+        KMCose.constructKdfContext(pubKeyA, pubKeyAOff, pubKeyALen, pubKeyB, pubKeyBOff, pubKeyBLen, true);
+    kdfContext = encoder.encode(kdfContext, scratchPad, offset);
+    kdfContext = KMByteBlob.instance(scratchPad, offset, kdfContext);
+
+    Util.arrayFillNonAtomic(scratchPad, offset, (short) 32, (byte) 0);
+    seProvider.hkdf(
+        KMByteBlob.cast(key).getBuffer(),
+        KMByteBlob.cast(key).getStartOff(),
+        KMByteBlob.cast(key).length(),
+        scratchPad,
+        offset,
+        (short) 32,
+        KMByteBlob.cast(kdfContext).getBuffer(),
+        KMByteBlob.cast(kdfContext).getStartOff(),
+        KMByteBlob.cast(kdfContext).length(),
+        scratchPad,
+        (short) 32, // offset
+        (short) 32 // Length of expected output.
+    );
+    Util.arrayCopy(scratchPad, (short) 32, scratchPad, offset, (short) 32);
+    return (short) 32;
+  }
+
+  private static short constructCoseEncrypt(byte[] sessionKey, short sessionKeyOff, short sessionKeyLen,
+                                            short signedMacPtr, short keyIdentifierPtr,
+                                            byte[] scratchPad, short offset) {
+
+    // protected headers.
+    short protectedHeader = KMCose.constructHeaders(
+        KMInteger.uint_8(KMCose.COSE_ALG_AES_GCM_256),
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE);
+    // Encode the protected header as byte blob.
+    protectedHeader = encoder.encode(protectedHeader, scratchPad, offset);
+    protectedHeader = KMByteBlob.instance(scratchPad, offset, protectedHeader);
+
+    // protected headers.
+    short protectedHeaderRecipient = KMCose.constructHeaders(
+        KMNInteger.uint_8(KMCose.COSE_ALG_ECDH_ES_HKDF_256),
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE);
+    // Encode the protected header as byte blob.
+    protectedHeaderRecipient = encoder.encode(protectedHeaderRecipient, scratchPad, offset);
+    protectedHeaderRecipient = KMByteBlob.instance(scratchPad, offset, protectedHeaderRecipient);
+
+    short coseEncryptStr =
+        KMCose.constructCoseEncryptStructure(protectedHeader, KMByteBlob.instance((short) 0));
+    coseEncryptStr = encoder.encode(coseEncryptStr, scratchPad, offset);
+    coseEncryptStr = KMByteBlob.instance(scratchPad, offset, coseEncryptStr);
+
+    /* Construct unprotected headers */
+    short pubLen = KMByteBlob.cast(data[PUB_KEY]).length();
+    short pubOff = KMByteBlob.cast(data[PUB_KEY]).getStartOff();
+    byte[] buf = KMByteBlob.cast(data[PUB_KEY]).getBuffer();
+    // prepare cosekey
+    short coseKey =
+        constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMType.INVALID_VALUE,
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            KMByteBlob.cast(data[PUB_KEY]).getBuffer(),
+            KMByteBlob.cast(data[PUB_KEY]).getStartOff(),
+            KMByteBlob.cast(data[PUB_KEY]).length(),
+            false
+        );
+    short unprotectedHeaderRecipient =
+        KMCose.constructHeaders(KMType.INVALID_VALUE, keyIdentifierPtr, KMType.INVALID_VALUE, coseKey);
+
+
+    // Construct recipients structure.
+    short recipientsStructure =
+        KMCose.constructRecipientsStructure(protectedHeaderRecipient, unprotectedHeaderRecipient,
+            KMSimpleValue.instance(KMSimpleValue.NULL));
+
+    //nonce.
+    seProvider.newRandomNumber(scratchPad, offset, AES_GCM_NONCE_LENGTH);
+    short nonce = KMByteBlob.instance(scratchPad, offset, AES_GCM_NONCE_LENGTH);
+
+    //payload
+    short payload = KMArray.instance((short) 2);
+    KMArray.cast(payload).add((short) 0, signedMacPtr);
+    KMArray.cast(payload).add((short) 1, data[BCC]);
+    payload = encoder.encode(payload, scratchPad, (short) (offset + AES_GCM_NONCE_LENGTH));
+    payload = KMByteBlob.instance(scratchPad, (short) (offset + AES_GCM_NONCE_LENGTH), payload);
+
+    short outlen =
+        seProvider.aesGCMEncrypt(
+            sessionKey,
+            sessionKeyOff,
+            sessionKeyLen,
+            KMByteBlob.cast(payload).getBuffer(), // input data
+            KMByteBlob.cast(payload).getStartOff(), // input offset
+            KMByteBlob.cast(payload).length(), // input length
+            scratchPad,  // output data
+            offset, // output data offset
+            KMByteBlob.cast(nonce).getBuffer(), // nonce data
+            KMByteBlob.cast(nonce).getStartOff(), // nonce offset
+            KMByteBlob.cast(nonce).length(), // nonce length
+            KMByteBlob.cast(coseEncryptStr).getBuffer(),
+            KMByteBlob.cast(coseEncryptStr).getStartOff(),
+            KMByteBlob.cast(coseEncryptStr).length(),
+            scratchPad,  // authTag
+            (short) (offset + KMByteBlob.cast(payload).length()), // authTag offset
+            AES_GCM_AUTH_TAG_LENGTH  // authTag Length
+        );
+    short cipherText = KMByteBlob.instance(scratchPad, offset, (short) (outlen + AES_GCM_AUTH_TAG_LENGTH));
+
+    /* Construct unprotected headers */
+    short unprotectedHeader =
+        KMCose.constructHeaders(KMType.INVALID_VALUE, KMType.INVALID_VALUE, nonce, KMType.INVALID_VALUE);
+
+    return KMCose.constructCoseEncrypt(protectedHeader, unprotectedHeader, cipherText, recipientsStructure);
+  }
+
   private static void processGenerateCsrCmd(APDU apdu) {
-    // TODO Validate and extract public keys.
-    // TODO Generate Ephemeral mac key
-    // TODO Generate COSE_Mac0 sign the public keys with Ephemeral mac key.
-    // TODO Populate Defvice Info
-    // TODO create COSE_Sign1 sign the ephemeroal mac with bcc key
-    // TODO Create Ephemeral ec p256 key pair.
-    // TODO Validate and extract the EEK
-    // TODO ECDH Key derivation and derive a session key.
-    // TODO Generate Nonce
-    // TODO Consturct COSE_Encrypt and createRecipient info structure.
     // Receive the incoming request fully from the master into buffer.
     receiveIncoming(apdu);
     // Re-purpose the apdu buffer as scratch pad.
@@ -3339,25 +3807,113 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     KMArray.cast(tmpVariables[1]).add((short) 1, KMByteBlob.exp()); // MacedPublicKeys - 'length+[maced_keys]'
     KMArray.cast(tmpVariables[1]).add((short) 2, KMByteBlob.exp()); // EEKChain - 'length+[coseSign1]'
     KMArray.cast(tmpVariables[1]).add((short) 3, KMByteBlob.exp()); // challenge
-    tmpVariables[2] = decoder.decode(tmpVariables[1], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET],
-        bufferProp[BUF_LEN_OFFSET]);
+    short inputArr =
+        decoder.decode(tmpVariables[1], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET],
+            bufferProp[BUF_LEN_OFFSET]);
     //reclaim memory
     repository.reclaimMemory(bufferProp[BUF_LEN_OFFSET]);
     // Extract the maced public keys from the byte blob
     // First byte holds the length of the array, followed by cbor array.
-    tmpVariables[1] = KMArray.cast(tmpVariables[2]).get((short) 1);
-    short len = KMByteBlob.cast(tmpVariables[1]).get((short) 0);
-    // Now decode the maced public keys
-    tmpVariables[3] = KMArray.instance(len);
-    short index = 0;
-    while (index < len) {
-      KMArray.cast(tmpVariables[3]).add(index++, KMByteBlob.exp());
-    }
-    // tmpVariables[4] holds the array of maced keys.
-    tmpVariables[4] = decoder.decode(tmpVariables[3], KMByteBlob.cast(tmpVariables[1]).getBuffer(),
-        (short) (KMByteBlob.cast(tmpVariables[1]).getStartOff() + 1),
-        (short) (KMByteBlob.cast(tmpVariables[1]).length() -1) );
+    tmpVariables[1] = KMArray.cast(inputArr).get((short) 1);
+    boolean testMode =
+        (KMSimpleValue.TRUE == KMSimpleValue.cast(KMArray.cast(inputArr).get((short) 0)).getValue());
 
+    tmpVariables[3] =
+        validateAndExtractPublicKeys(testMode,
+            KMByteBlob.cast(tmpVariables[1]).getBuffer(),
+            KMByteBlob.cast(tmpVariables[1]).getStartOff(),
+            KMByteBlob.cast(tmpVariables[1]).length(),
+            scratchPad,
+            (short) 0);
+    tmpVariables[3] = encoder.encode(tmpVariables[3], scratchPad, (short) 0);
+    // pubKeysToSign = bstr .cbor [CoseKey1, CoseKey2 ..]
+    short pubKeysToSign = KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[3]);
+
+    // Generate ephemeral mac key.
+    short ephemeralMacKey = KMByteBlob.instance(EPHEMERAL_MAC_KEY_SIZE);
+    seProvider.newRandomNumber(
+        KMByteBlob.cast(ephemeralMacKey).getBuffer(),
+        KMByteBlob.cast(ephemeralMacKey).getStartOff(),
+        KMByteBlob.cast(ephemeralMacKey).length());
+    // Sign the pubKeysToSign with ephemeral mac key.
+    short pubKeysToSignMac =
+        constructPubKeysToSignMac(scratchPad,
+            (short) 0,
+            KMByteBlob.cast(ephemeralMacKey).getBuffer(),
+            KMByteBlob.cast(ephemeralMacKey).getStartOff(),
+            KMByteBlob.cast(ephemeralMacKey).length(),
+            pubKeysToSign);
+    // Populate deviceInfo.
+    short deviceInfo = createDeviceInfo();
+
+    // Generate bcc
+    generateBcc(scratchPad, (short) 0, (short) 6);
+
+    // Construct cose_sign1 with ephemeral key as payload.
+    short signedMac =
+        createSignedMac(scratchPad,
+            (short) 0,
+            ephemeralMacKey,
+            KMArray.cast(inputArr).get((short) 3),
+            deviceInfo);
+
+    // Create ephemeral ec key.
+    seProvider.createAsymmetricKey(
+        KMType.EC,
+        scratchPad,
+        (short) 0,
+        (short) 128,
+        scratchPad,
+        (short) (128),
+        (short) 128,
+        tmpVariables);
+    data[SECRET] = KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[0]);
+    data[PUB_KEY] = KMByteBlob.instance(scratchPad, (short) 128, tmpVariables[1]);
+
+
+    // tmpVariables[4] holds the coseKey pointer.
+    short eekChain = KMArray.cast(inputArr).get((short) 2);
+    short eekKey =
+        validateAndExtractEekPub(testMode,
+            KMByteBlob.cast(eekChain).getBuffer(),
+            KMByteBlob.cast(eekChain).getStartOff(),
+            KMByteBlob.cast(eekChain).length(),
+            scratchPad,
+            (short) 0);
+    // tmpVariables[5] holds byteBlob pointer.
+    short eekKeyId =
+        KMCoseKey.cast(eekKey).getKeyIdentifier();
+    // Convert the coseKey to a public key.
+    tmpVariables[1] = KMCoseKey.cast(eekKey).getEcdsa256PublicKey(scratchPad, (short) 0);
+    short eekPub = KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[1]);
+
+    short sessionKeyLen =
+        ecdhHkdfDeriveKey(
+            KMByteBlob.cast(data[SECRET]).getBuffer(),
+            KMByteBlob.cast(data[SECRET]).getStartOff(),
+            KMByteBlob.cast(data[SECRET]).length(),
+            KMByteBlob.cast(data[PUB_KEY]).getBuffer(),
+            KMByteBlob.cast(data[PUB_KEY]).getStartOff(),
+            KMByteBlob.cast(data[PUB_KEY]).length(),
+            KMByteBlob.cast(eekPub).getBuffer(),
+            KMByteBlob.cast(eekPub).getStartOff(),
+            KMByteBlob.cast(eekPub).length(),
+            scratchPad,
+            (short) 0
+        );
+
+    short protectedData =
+        constructCoseEncrypt(scratchPad, (short) 0, sessionKeyLen, signedMac, eekKeyId, scratchPad, sessionKeyLen);
+
+    tmpVariables[1] = KMArray.instance((short) 4);
+    KMArray.cast(tmpVariables[1]).add((short) 0, buildErrorStatus(KMError.OK));
+    KMArray.cast(tmpVariables[1]).add((short) 1, deviceInfo);
+    KMArray.cast(tmpVariables[1]).add((short) 2, protectedData);
+    KMArray.cast(tmpVariables[1]).add((short) 3, pubKeysToSignMac);
+    bufferProp[BUF_START_OFFSET] = repository.allocAvailableMemory();
+    // Encode the response
+    bufferProp[BUF_LEN_OFFSET] = encoder.encode(tmpVariables[1], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET]);
+    sendOutgoing(apdu);
   }
 
   /**
@@ -3384,33 +3940,18 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     // create key blob
     data[ORIGIN] = KMType.GENERATED;
     createEncryptedKeyBlob(scratchPad);
-    // divide pub_key to x and y
-    // tmpVariables[3] holds length and tmpVariables[4] holds offset.
-    tmpVariables[3] = KMByteBlob.cast(data[PUB_KEY]).length();
-    tmpVariables[4] = KMByteBlob.cast(data[PUB_KEY]).getStartOff();
-    byte[] buf = KMByteBlob.cast(data[PUB_KEY]).getBuffer();
-    // TODO What if first byte is not 0x04.
-    // TODO Move this logic inside cosntructKey
-    if (buf[tmpVariables[4]] == 0x04) { // uncompressed format
-      tmpVariables[3]--;
-      tmpVariables[4]++;
-    }
-    tmpVariables[3] = (short) (tmpVariables[3] / 2);
-    short xPtr = KMByteBlob.instance(buf, tmpVariables[4], tmpVariables[3]);
-    short yPtr = KMByteBlob.instance(buf, (short) (tmpVariables[4] + tmpVariables[3]), tmpVariables[3]);
-
     // prepare cosekey
     short coseKey =
-        KMCose.constructCoseKey(
+        constructCoseKey(
             KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
             KMType.INVALID_VALUE,
             KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
             KMType.INVALID_VALUE,
             KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
-            xPtr,
-            yPtr,
+            KMByteBlob.cast(data[PUB_KEY]).getBuffer(),
+            KMByteBlob.cast(data[PUB_KEY]).getStartOff(),
+            KMByteBlob.cast(data[PUB_KEY]).length(),
             testMode);
-    KMCoseKey.cast(coseKey).canonicalize();
     // Encode the cose key and make it as payload.
     tmpVariables[1] = encoder.encode(coseKey, scratchPad, (short) 0);
     short payload = KMByteBlob.instance(tmpVariables[1]);
@@ -3450,7 +3991,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     // Create COSE_MAC0 object
     tmpVariables[1] =
         KMCose.constructCoseMac0(protectedHeader, KMCoseHeaders.instance(KMArray.instance((short) 0)), payload,
-            KMByteBlob.instance(scratchPad, len, (short) (len + hmacLen)));
+            KMByteBlob.instance(scratchPad, len, hmacLen));
 
     // Encode the COSE_MAC0 object
     tmpVariables[1] = encoder.encode(tmpVariables[1], scratchPad, (short) 0);

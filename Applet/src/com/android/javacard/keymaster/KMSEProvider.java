@@ -404,7 +404,7 @@ public interface KMSEProvider extends KMUpgradable {
    * @param ecPrivKey instance of KMAttestationKey.
    * @param inputDataBuf is the buffer of the input data.
    * @param inputDataStart is the start of the input data buffer.
-   * @param inputDataLength is the length of the inpur data buffer in bytes.
+   * @param inputDataLength is the length of the input data buffer in bytes.
    * @param outputDataBuf is the output buffer that contains the signature.
    * @param outputDataStart is the start of the output data buffer.
    * @return length of the decrypted data.
@@ -416,6 +416,52 @@ public interface KMSEProvider extends KMUpgradable {
       short inputDataLength,
       byte[] outputDataBuf,
       short outputDataStart);
+
+  /**
+   * This is a oneshot operation that signs the data using EC private key.
+   *
+   * @param privBuf         is the private key buffer.
+   * @param privBufStart    is the start of the private key buffer.
+   * @param privBufLen      is the length of the private key buffer.
+   * @param inputDataBuf    is the buffer of the input data.
+   * @param inputDataStart  is the start of the input data buffer.
+   * @param inputDataLength is the length of the input data buffer in bytes.
+   * @param outputDataBuf   is the output buffer that contains the signature.
+   * @param outputDataStart is the start of the output data buffer.
+   * @return length of the decrypted data.
+   */
+  short ecSign256(
+      byte[] privBuf,
+      short privBufStart,
+      short privBufLen,
+      byte[] inputDataBuf,
+      short inputDataStart,
+      short inputDataLength,
+      byte[] outputDataBuf,
+      short outputDataStart);
+
+  /**
+   * @param pubKey             is the public key buffer.
+   * @param pubKeyOffset       is the start of the public key buffer.
+   * @param pubKeyLen          is the length of the public key.
+   * @param inputDataBuf       is the buffer of the input data.
+   * @param inputDataStart     is the start of the input data buffer.
+   * @param inputDataLength    is the length of the input data buffer in bytes.
+   * @param signatureDataBuf   is the buffer the signature input data.
+   * @param signatureDataStart is the start of the signature input data.
+   * @param signatureDataLen   is the length of the signature input data.
+   * @return true if verification is successful, otherwise false.
+   */
+  boolean ecVerify256(
+      byte[] pubKey,
+      short pubKeyOffset,
+      short pubKeyLen,
+      byte[] inputDataBuf,
+      short inputDataStart,
+      short inputDataLength,
+      byte[] signatureDataBuf,
+      short signatureDataStart,
+      short signatureDataLen);
 
   /**
    * This creates a persistent operation for signing, verify, encryption and decryption using HMAC,

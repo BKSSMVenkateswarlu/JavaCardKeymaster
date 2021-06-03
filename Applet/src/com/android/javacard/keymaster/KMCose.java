@@ -18,7 +18,6 @@ package com.android.javacard.keymaster;
 
 import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
-import javacard.framework.Util;
 
 /**
  * This class constructs the Cose messages like CoseKey, CoseMac0, MacStructure,
@@ -100,6 +99,24 @@ public class KMCose {
   //Empty strings
   public static final byte[] EMPTY_MAC_KEY =
       {0x45, 0x6d, 0x70, 0x74, 0x79, 0x20, 0x4d, 0x41, 0x43, 0x20, 0x6b, 0x65, 0x79}; // "Empty MAC key"
+
+  // Certificate payload supported keys
+  public static final byte ISSUER = (byte) 0x01;
+  public static final byte SUBJECT = (byte) 0x02;
+  public static final byte[] CODE_HASH = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAF};
+  public static final byte[] CODE_DESCRIPTOR = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAE};
+  public static final byte[] CONFIG_HASH = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAD};
+  public static final byte[] CONFIG_DESCRIPTOR = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAC};
+  public static final byte[] AUTHORITY_HASH = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAB};
+  public static final byte[] AUTHORITY_DESCRIPTOR = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xAA};
+  public static final byte[] MODE = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xA9};
+  public static final byte[] SUBJECT_PUBLIC_KEY = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xA8};
+  public static final byte[] KEY_USAGE = {(byte) 0xFF, (byte) 0xB8, (byte) 0xBB, (byte) 0xA7};
+  // text strings
+  public static final byte[] TEST_ISSUER_NAME = {(byte) 0x49, 0x73, 0x73, 0x75, 0x65, 0x72}; // "Issuer"
+  public static final byte[] TEST_SUBJECT_NAME = {0x53, 0x75, 0x62, 0x6A, 0x65, 0x63, 0x74}; // "Subject"
+  public static final byte[] KEY_USAGE_SIGN = {0x20}; // Key usage sign
+
 
   /**
    * Constructs the Cose MAC structure.
@@ -218,8 +235,14 @@ public class KMCose {
     return arrPtr;
   }
 
-  // TODO Comments
-  private static short constructMap(short[] tags, boolean includeExtraTag) {
+  /**
+   * Constructs array based on the tag values provided.
+   *
+   * @param tags      array of tag values to be constructed.
+   * @param extraTags Length of the extra tags to be included in the array.
+   * @return instance of KMArray.
+   */
+  private static short constructCoseTagValues(short[] tags, short extraTags) {
     short index = 0;
     // var is used to calculate the length of the array.
     short var = 0;
@@ -231,7 +254,7 @@ public class KMCose {
       }
       index += 3;
     }
-    if (includeExtraTag) var++;
+    var += extraTags;
     short arrPtr = KMArray.instance(var);
     index = 0;
     // var is used to index the array.
@@ -245,7 +268,34 @@ public class KMCose {
     return arrPtr;
   }
 
-  // TODO Comments
+  /**
+   * Constructs the COSE_sign1 payload for certificate.
+   *
+   * @param issuer       instance of KMCoseKeyTextStringValue which contains issuer value.
+   * @param subject      instance of KMCoseKeyTextStringValue which contains subject value.
+   * @param subPublicKey instance of KMCoseKeyByteBlobValue which contains encoded KMCoseKey.
+   * @param keyUsage     instance of KMCoseKeyByteBlobValue which contains key usage value.
+   * @return instance of KMArray.
+   */
+  public static short constructCoseCertPayload(short issuer, short subject, short subPublicKey, short keyUsage) {
+    short certPayload = KMArray.instance((short) 4);
+    KMArray.cast(certPayload).add((short) 0, issuer);
+    KMArray.cast(certPayload).add((short) 1, subject);
+    KMArray.cast(certPayload).add((short) 2, subPublicKey);
+    KMArray.cast(certPayload).add((short) 3, keyUsage);
+    return certPayload;
+  }
+
+  /**
+   * Construct headers structure. Headers can be part of COSE_Sign1, COSE_Encrypt,
+   * COSE_Mac0 and COSE_Key.
+   *
+   * @param alg          instance of either KMNInteger or KMInteger, based on the sign of algorithm value.
+   * @param keyId        instance of KMByteBlob which contains the key identifier.
+   * @param iv           instance of KMByteblob which contains the iv buffer.
+   * @param ephemeralKey instance of KMCoseKey.
+   * @return instance of KMCoseHeaders.
+   */
   public static short constructHeaders(short alg, short keyId, short iv, short ephemeralKey) {
     short[] coseHeaderTags = {
         KMCose.COSE_LABEL_ALGORITHM, alg, KMType.INVALID_VALUE,
@@ -253,11 +303,18 @@ public class KMCose {
         KMCose.COSE_LABEL_IV, iv, KMType.INVALID_VALUE,
         KMCose.COSE_LABEL_COSE_KEY, ephemeralKey, KMType.INVALID_VALUE
     };
-    short arrPtr = constructMap(coseHeaderTags, false);
+    short arrPtr = constructCoseTagValues(coseHeaderTags, (short) 0);
     return KMCoseHeaders.instance(arrPtr);
   }
 
-  // TODO Comments
+  /**
+   * Construct Recipients structure for COSE_Encrypt message.
+   *
+   * @param protectedHeaders   instance of KMByteBlob which contains encoded KMCoseHeaders.
+   * @param unprotectedHeaders instance of KMCoseHeaders.
+   * @param cipherText         instance of KMSimple
+   * @return instance of KMArray.
+   */
   public static short constructRecipientsStructure(short protectedHeaders, short unprotectedHeaders,
                                                    short cipherText) {
     // recipients : [+COSE_recipient]
@@ -279,7 +336,13 @@ public class KMCose {
     return recipientsArrayPtr;
   }
 
-  // TODO Comments
+  /**
+   * Construct Encrypt structure required for COSE_Encrypt message.
+   *
+   * @param protectedHeader instance of KMByteBlob which wraps KMCoseHeaders.
+   * @param aad             instance of KMByteBlob.
+   * @return instance of KMArray.
+   */
   public static short constructCoseEncryptStructure(short protectedHeader, short aad) {
     //  Enc_structure = [
     //       context : "Encrypt" / "Encrypt0" / "Enc_Recipient" /
@@ -298,7 +361,15 @@ public class KMCose {
     return arrPtr;
   }
 
-  // TODO Comments
+  /**
+   * Constructs COSE_Encrypt message.
+   *
+   * @param protectedHeader   instance of KMByteBlob which wraps KMCoseHeaders.
+   * @param unProtectedHeader instance of KMCoseHeaders.
+   * @param cipherText        instance of KMByteBlob containing the cipher text.
+   * @param recipients        instance of KMArray containing the recipients instance
+   * @return instance of KMArray.
+   */
   public static short constructCoseEncrypt(short protectedHeader, short unProtectedHeader, short cipherText,
                                            short recipients) {
     // COSE_Encrypt = [
@@ -341,6 +412,10 @@ public class KMCose {
         return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
       case KMType.BYTE_BLOB_TYPE:
         return KMCoseKeyByteBlobValue.instance(keyPtr, valuePtr);
+      case KMType.TEXT_STRING_TYPE:
+        return KMCoseKeyTextStringValue.instance(keyPtr, valuePtr);
+      case KMType.COSE_KEY_TYPE:
+        return KMCoseKeyCoseKeyValue.instance(keyPtr, valuePtr);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
@@ -372,32 +447,8 @@ public class KMCose {
         KMCose.COSE_KEY_PUBKEY_X, pubX, KMType.INVALID_VALUE,
         KMCose.COSE_KEY_PUBKEY_Y, pubY, KMType.INVALID_VALUE,
     };
-    // TODO Remove below commented code once the uncommented code works.
-//    short index = 0;
-//    // var is used to calculate the length of the array.
-//    short var = 0;
-//    while (index < coseKeyTags.length) {
-//      if (coseKeyTags[index + 1] != KMType.INVALID_VALUE) {
-//        coseKeyTags[(short) (index + 2)] =
-//            buildCoseKeyTagValue((byte) coseKeyTags[index], coseKeyTags[(short) (index + 1)]);
-//        var++;
-//      }
-//      index += 3;
-//    }
-//    if (testMode)
-//      var++;
-//
-//    short arrPtr = KMArray.instance(var);
-//    index = 0;
-//    // var is used to index the array.
-//    var = 0;
-//    while (index < coseKeyTags.length) {
-//      if (coseKeyTags[index + 2] != KMType.INVALID_VALUE) {
-//        KMArray.cast(arrPtr).add(var++, coseKeyTags[index + 2]);
-//      }
-//      index += 3;
-//    }
-    short arrPtr = constructMap(coseKeyTags, testMode);
+    short extraTag = (short) (testMode ? 1 : 0);
+    short arrPtr = constructCoseTagValues(coseKeyTags, extraTag);
     if (testMode) {
       short testKey =
           KMCoseKeySimpleValue.instance(KMNInteger.uint_32(KMCose.COSE_TEST_KEY, (short) 0),
@@ -407,14 +458,25 @@ public class KMCose {
     return KMCoseKey.instance(arrPtr);
   }
 
-  // TODO Comments
+  /**
+   * Constructs key derivation context which is required to compute HKDF.
+   *
+   * @param publicKeyA    public key buffer from the first party.
+   * @param publicKeyAOff start position of the public key buffer from first party.
+   * @param publicKeyALen length of the public key buffer from first party.
+   * @param publicKeyB    public key buffer from the second party.
+   * @param publicKeyBOff start position of the public key buffer from second party.
+   * @param publicKeyBLen length of the public key buffer from second party.
+   * @param senderIsA     true if caller is first party, false if caller is second party.
+   * @return instance of KMArray.
+   */
   public static short constructKdfContext(byte[] publicKeyA, short publicKeyAOff, short publicKeyALen,
                                           byte[] publicKeyB, short publicKeyBOff, short publicKeyBLen,
                                           boolean senderIsA) {
     short index = 0;
     // Prepare sender info
     short senderInfo = KMArray.instance((short) 3);
-    KMArray.cast(senderInfo).add(index, KMByteBlob.instance(client, (short) 0, (short) client.length));
+    KMArray.cast(senderInfo).add(index++, KMByteBlob.instance(client, (short) 0, (short) client.length));
     KMArray.cast(senderInfo).add(index++, KMByteBlob.instance((short) 0));
     KMArray.cast(senderInfo).add(index, senderIsA ?
         KMByteBlob.instance(publicKeyA, publicKeyAOff, publicKeyALen) :
@@ -433,7 +495,7 @@ public class KMCose {
     index = 0;
     short publicInfo = KMArray.instance((short) 2);
     KMArray.cast(publicInfo).add(index++, KMInteger.uint_16(AES_GCM_KEY_SIZE_BITS));
-    KMArray.cast(recipientInfo).add(index, KMByteBlob.instance((short) 0));
+    KMArray.cast(publicInfo).add(index, KMByteBlob.instance((short) 0));
 
     // construct kdf context
     index = 0;

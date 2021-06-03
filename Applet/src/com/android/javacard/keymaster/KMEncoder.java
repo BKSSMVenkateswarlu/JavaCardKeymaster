@@ -80,8 +80,8 @@ public class KMEncoder {
     scratchBuf[STACK_PTR_OFFSET] = 0;
     bufferRef[0] = buffer;
     scratchBuf[START_OFFSET] = startOff;
-    short len = (short) buffer.length;
-    if ((len < 0) || (len > KMKeymasterApplet.MAX_LENGTH)) {
+    short len = (short) (buffer.length - startOff);
+    if ((len < 0) || len > KMKeymasterApplet.MAX_LENGTH) {
       scratchBuf[LEN_OFFSET] = KMKeymasterApplet.MAX_LENGTH;
     } else {
       scratchBuf[LEN_OFFSET] = (short) buffer.length;
@@ -216,6 +216,20 @@ public class KMEncoder {
     encode(coseKeyByteBlobValue.getKeyPtr());
   }
 
+  private void encodeCoseKeyCoseKeyValue(short exp) {
+    KMCoseKeyCoseKeyValue coseKeyCoseKeyValue = KMCoseKeyCoseKeyValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeyCoseKeyValue.getValuePtr());
+    encode(coseKeyCoseKeyValue.getKeyPtr());
+  }
+
+  private void encodeCoseKeyTextStringValue(short exp) {
+    KMCoseKeyTextStringValue coseKeyTextStringValue = KMCoseKeyTextStringValue.cast(exp);
+    // push key and value ptr in stack to get encoded.
+    encode(coseKeyTextStringValue.getValuePtr());
+    encode(coseKeyTextStringValue.getKeyPtr());
+  }
+
   private void encodeCoseKeySimpleValue(short exp) {
     KMCoseKeySimpleValue coseKeySimpleValue = KMCoseKeySimpleValue.cast(exp);
     // push key and value ptr in stack to get encoded.
@@ -243,6 +257,12 @@ public class KMEncoder {
         return;
       case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
         encodeCoseKeySimpleValue(exp);
+        return;
+      case KMType.COSE_KEY_TAG_TXT_STR_VALUE_TYPE:
+        encodeCoseKeyTextStringValue(exp);
+        return;
+      case KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE:
+        encodeCoseKeyCoseKeyValue(exp);
         return;
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
@@ -471,6 +491,10 @@ public class KMEncoder {
     // int - 4 bytes
     // long - 8 bytes.
     KMUtils.computeOnesCompliment(buf, correctedOffset, correctedLen);
+    encodeInteger(buf, len, offset, NEG_INT_TYPE);
+    // Once after encoding retain back the original buffer. This is to make sure that encoder does not modify the
+    // original value of a KMNInteger type.
+    KMUtils.computeOnesCompliment(buf, correctedOffset, correctedLen);
   }
 
   private void encodeNegInteger(short obj) {
@@ -478,7 +502,6 @@ public class KMEncoder {
     short len = KMNInteger.cast(obj).length();
     short startOff = KMNInteger.cast(obj).getStartOff();
     encodeNegIntegerValue(val, startOff, len);
-    encodeInteger(val, len, startOff, NEG_INT_TYPE);
   }
 
   private void encodeUnsignedInteger(short obj) {

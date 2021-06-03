@@ -20,8 +20,11 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
-//TODO Comments.
-//TODO Merge KMTextString and KMByteBLob
+/**
+ * KMTextString represents contiguous block of bytes. It corresponds to CBOR type of Text String. It
+ * extends KMByteBlob by specifying value field as zero or more sequence of bytes. struct{ byte
+ * TEXT_STR_TYPE; short length; sequence of bytes}
+ */
 public class KMTextString extends KMByteBlob {
 
   private static KMTextString prototype;

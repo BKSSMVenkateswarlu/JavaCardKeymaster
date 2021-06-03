@@ -20,15 +20,22 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
+/**
+ * KMCoseKeyByteBlobValue represents a key-value type, where key can be KMInteger or KMNInteger and value is
+ * KMByteBlob type. struct{byte TAG_TYPE; short length; struct{short BYTE_BLOB_TYPE; short key; short value}}.
+ */
 public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
 
   private static KMCoseKeyByteBlobValue prototype;
 
-  public static final byte[] keys = {
-    KMCose.COSE_KEY_PUBKEY_X,
-    KMCose.COSE_KEY_PUBKEY_Y,
-    KMCose.COSE_LABEL_IV,
-    KMCose.COSE_LABEL_KEYID,
+  public static final byte[][] keys = {
+      {0, 0, 0, KMCose.COSE_KEY_PUBKEY_X},
+      {0, 0, 0, KMCose.COSE_KEY_PUBKEY_Y},
+      {0, 0, 0, KMCose.COSE_LABEL_IV},
+      {0, 0, 0, KMCose.COSE_LABEL_KEYID},
+      {0, 0, 0, KMCose.COSE_KEY_KEY_ID},
+      KMCose.SUBJECT_PUBLIC_KEY,
+      KMCose.KEY_USAGE
   };
 
   private KMCoseKeyByteBlobValue() {
@@ -52,7 +59,7 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
   }
 
   public static short instance(short keyPtr, short valuePtr) {
-    if (!isKeyValueValid(KMCoseKeyTypeValue.getKeyValueAsShort(keyPtr))) {
+    if (!isKeyValueValid(keyPtr)) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     if (KMType.getType(valuePtr) != BYTE_BLOB_TYPE) {
@@ -92,11 +99,21 @@ public class KMCoseKeyByteBlobValue extends KMCoseKeyTypeValue {
     return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_BYTE_BLOB_VAL_OFFSET] + TLV_HEADER_SIZE + 4));
   }
 
-  public static boolean isKeyValueValid(short keyVal) {
+  public static boolean isKeyValueValid(short keyPtr) {
+    short type = KMType.getType(keyPtr);
+    short offset = 0;
+    if (type == INTEGER_TYPE) {
+      offset = KMInteger.cast(keyPtr).getStartOff();
+    } else if (type == NEG_INTEGER_TYPE) {
+      offset = KMNInteger.cast(keyPtr).getStartOff();
+    } else {
+      ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+    }
     short index = 0;
     while (index < (short) keys.length) {
-      if ((byte) (keyVal & 0xFF) == keys[index])
+      if (0 == Util.arrayCompare(keys[index], (short) 0, heap, offset, (short) keys[index].length)) {
         return true;
+      }
       index++;
     }
     return false;

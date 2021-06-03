@@ -207,6 +207,12 @@ public class KMDecoder {
     return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
   }
 
+  private short decodeCoseKeyTxtStringValue(short exp) {
+    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyTextStringValue.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCoseKeyTextStringValue.cast(exp).getValuePtr());
+    return KMCoseKeyTextStringValue.instance(keyPtr, valuePtr);
+  }
+
   private short decodeCoseKeyCoseKeyValue(short exp) {
     short keyPtr = decodeCoseKeyKeyType((KMCoseKeyCoseKeyValue.cast(exp).getKeyPtr()));
     short valuePtr = decode(KMCoseKeyCoseKeyValue.cast(exp).getValuePtr());
@@ -251,6 +257,8 @@ public class KMDecoder {
       tagValueType = KMType.COSE_KEY_TAG_NINT_VALUE_TYPE;
     } else if (majorType == MAP_TYPE) {
       tagValueType = KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE;
+    } else if (majorType == SIMPLE_VALUE_TYPE) {
+      tagValueType = KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE;
     } else {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
@@ -269,6 +277,8 @@ public class KMDecoder {
         return decodeCoseKeySimpleValue(exp);
       case KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE:
         return decodeCoseKeyCoseKeyValue(exp);
+      case KMType.COSE_KEY_TAG_TXT_STR_VALUE_TYPE:
+        return decodeCoseKeyTxtStringValue(exp);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;

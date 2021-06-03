@@ -4,7 +4,10 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
-// TODO Comments.
+/**
+ * KMCoseKeySimpleValue represents a key-value type, where key can be KMInteger or KMNInteger and value is
+ * KMSimpleValue type. struct{byte TAG_TYPE; short length; struct{short SIMPLE_VALUE_TYPE; short key; short value}}.
+ */
 public class KMCoseKeySimpleValue extends KMCoseKeyTypeValue {
 
   private static KMCoseKeySimpleValue prototype;

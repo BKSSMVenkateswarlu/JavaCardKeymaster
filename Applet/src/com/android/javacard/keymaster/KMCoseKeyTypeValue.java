@@ -28,7 +28,7 @@ import javacard.framework.Util;
  * only are supported. The structure representing all the sub classes of KMCoseKeyTypeValue is as follows:
  * KM_COSE_KEY_TAG_TYPE(1byte), Length(2 bytes), COSE_KEY_TAG_*_VALUE_TYPE(2 bytes), Key(2 bytes), Value(2 bytes).
  * Key can be either KMInteger or KMNInteger and Value can be either KMIntger or KMNinteger or KMSimpleValue
- * or KMByteBlob. Each subclass of KMCoseKeyTypeValue is named after their corresponding value types.
+ * or KMByteBlob or KMTextString. Each subclass of KMCoseKeyTypeValue is named after their corresponding value types.
  */
 public abstract class KMCoseKeyTypeValue extends KMType {
 
@@ -116,7 +116,7 @@ public abstract class KMCoseKeyTypeValue extends KMType {
    * @param keyPtr Pointer to either KMInteger or KMNInteger
    * @return value of the key as short.
    */
-  public static short getKeyValueAsShort(short keyPtr) {
+  public static short getKeyValueShort(short keyPtr) {
     short type = KMType.getType(keyPtr);
     short value = 0;
     if (type == INTEGER_TYPE) {
@@ -127,6 +127,36 @@ public abstract class KMCoseKeyTypeValue extends KMType {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     return value;
+  }
+
+  /**
+   * Returns the significant short value of the key.
+   *
+   * @param keyPtr Pointer to either KMInteger or KMNInteger
+   * @return value of the key as short.
+   */
+  public static short getKeyValueSignificantShort(short keyPtr) {
+    short type = KMType.getType(keyPtr);
+    short value = 0;
+    if (type == INTEGER_TYPE) {
+      value = KMInteger.cast(keyPtr).getSignificantShort();
+    } else if (type == NEG_INTEGER_TYPE) {
+      value = KMNInteger.cast(keyPtr).getSignificantShort();
+    } else {
+      ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+    }
+    return value;
+  }
+
+  public static void getKeyValue(short keyPtr, byte[] dest, short offset, short len) {
+    short type = KMType.getType(keyPtr);
+    if (type == INTEGER_TYPE) {
+      KMInteger.cast(keyPtr).getValue(dest, offset, len);
+    } else if (type == NEG_INTEGER_TYPE) {
+      KMNInteger.cast(keyPtr).getValue(dest, offset, len);
+    } else {
+      ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+    }
   }
 
   /**
@@ -172,21 +202,4 @@ public abstract class KMCoseKeyTypeValue extends KMType {
    * @return value pointer.
    */
   public abstract short getValuePtr();
-
-  // TODO validate the values based on the algorithm
-  // This is has to be done when using the cose key to sign
-  // or encrypt.
-  // For example:
-  // ECDSA
-  //  key type mandatory and value should be EC2
-  //  alg should be ES256
-  //  key_ops should be sign, verify
-  //  curve is 256
-  // ECDH
-  //  key type mandatory and value should be EC2
-  //  alg should be ECDH_ES_HKDF
-  // HMAC
-  //  key type mandatory and value should be EC2
-  //  alg should be SYMMETRIC
-  //  key_ops should be sign, verify
 }

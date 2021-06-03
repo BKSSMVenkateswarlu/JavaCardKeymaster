@@ -33,7 +33,7 @@ public class KMRepository implements KMUpgradable {
   public static final short DATA_INDEX_SIZE = 22;
   public static final short DATA_INDEX_ENTRY_SIZE = 4;
   public static final short DATA_MEM_SIZE = 2048;
-  public static final short HEAP_SIZE = 10000;
+  public static final short HEAP_SIZE = 15000;
   public static final short DATA_INDEX_ENTRY_LENGTH = 0;
   public static final short DATA_INDEX_ENTRY_OFFSET = 2;
   public static final short OPERATION_HANDLE_SIZE = 8; /* 8 bytes */
@@ -143,10 +143,7 @@ public class KMRepository implements KMUpgradable {
   // 1. Card reset event
   // 2. Applet upgrade.
   public boolean isPowerResetEventOccurred() {
-    if (powerResetStatus[0] == POWER_RESET_STATUS_FLAG) {
-      return false;
-    }
-    return true;
+    return !(powerResetStatus[0] == POWER_RESET_STATUS_FLAG);
   }
 
   /**
@@ -167,7 +164,7 @@ public class KMRepository implements KMUpgradable {
   public KMOperationState findOperation(byte[] buf, short off, short len) {
     short index = 0;
     byte[] oprTableData;
-    short offset = 0;
+    short offset;
     oprTableData = (byte[]) operationStateTable[OPER_TABLE_DATA_OFFSET];
     Object[] operations = (Object[]) operationStateTable[OPER_TABLE_OPR_OFFSET];
     while (index < MAX_OPS) {
@@ -200,7 +197,7 @@ public class KMRepository implements KMUpgradable {
   public KMOperationState reserveOperation(short opHandle) {
     short index = 0;
     byte[] oprTableData = (byte[]) operationStateTable[OPER_TABLE_DATA_OFFSET];
-    short offset = 0;
+    short offset;
     while (index < MAX_OPS) {
       offset = (short) (index * OPER_DATA_LEN);
       /* Check for unreserved operation state */
@@ -216,7 +213,7 @@ public class KMRepository implements KMUpgradable {
     short index = 0;
     byte[] oprTableData = (byte[]) operationStateTable[OPER_TABLE_DATA_OFFSET];
     Object[] operations = (Object[]) operationStateTable[OPER_TABLE_OPR_OFFSET];
-    short offset = 0;
+    short offset;
     short buf = KMByteBlob.instance(OPERATION_HANDLE_SIZE);
     getOperationHandle(
         opHandle,
@@ -266,7 +263,7 @@ public class KMRepository implements KMUpgradable {
     short index = 0;
     byte[] oprTableData = (byte[]) operationStateTable[OPER_TABLE_DATA_OFFSET];
     Object[] operations = (Object[]) operationStateTable[OPER_TABLE_OPR_OFFSET];
-    short offset = 0;
+    short offset;
     short buf = KMByteBlob.instance(OPERATION_HANDLE_SIZE);
     getOperationHandle(
         op.getHandle(),
@@ -294,7 +291,7 @@ public class KMRepository implements KMUpgradable {
     short index = 0;
     byte[] oprTableData = (byte[]) operationStateTable[OPER_TABLE_DATA_OFFSET];
     Object[] operations = (Object[]) operationStateTable[OPER_TABLE_OPR_OFFSET];
-    short offset = 0;
+    short offset;
     while (index < MAX_OPS) {
       offset = (short) (index * OPER_DATA_LEN);
       if (oprTableData[(short) (offset + OPERATION_HANDLE_STATUS_OFFSET)] == 1) {
@@ -367,6 +364,7 @@ public class KMRepository implements KMUpgradable {
     if (reclaimIndex[0] < heapIndex[0]) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
+    Util.arrayFillNonAtomic(heap, reclaimIndex[0], length, (byte) 0x00);
     reclaimIndex[0] += length;
   }
 

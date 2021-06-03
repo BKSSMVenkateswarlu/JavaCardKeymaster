@@ -20,6 +20,10 @@ import javacard.framework.ISO7816;
 import javacard.framework.ISOException;
 import javacard.framework.Util;
 
+/**
+ * KMCoseKeyNIntegerValue represents a key-value type, where key can be KMInteger or KMNInteger and value is
+ * KMNInteger type. struct{byte TAG_TYPE; short length; struct{short NINT_VALUE_TYPE; short key; short value}}.
+ */
 public class KMCoseKeyNIntegerValue extends KMCoseKeyTypeValue {
 
   private static KMCoseKeyNIntegerValue prototype;
