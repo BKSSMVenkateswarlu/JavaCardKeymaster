@@ -3340,7 +3340,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     short ptr2;
     short signStructure;
     short encodedLen;
-    short lastCoseKey = 0;
+    short prevCoseKey = 0;
     short keySize;
     short alg = KMCose.COSE_ALG_ES256;
     short index;
@@ -3364,10 +3364,10 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
       if (!KMCoseKey.cast(ptr2).isDataValid(KMCose.COSE_KEY_TYPE_EC2, KMType.INVALID_VALUE, alg,
           KMType.INVALID_VALUE, KMCose.COSE_ECCURVE_256))
         KMException.throwIt(KMError.STATUS_INVALID_EEK);
-      if (lastCoseKey == 0)
-        lastCoseKey = ptr2;
+      if (prevCoseKey == 0)
+        prevCoseKey = ptr2;
       // Get the public key.
-      keySize = KMCoseKey.cast(lastCoseKey).getEcdsa256PublicKey(scratchPad, offset);
+      keySize = KMCoseKey.cast(prevCoseKey).getEcdsa256PublicKey(scratchPad, offset);
       if (keySize != 65) {
         KMException.throwIt(KMError.STATUS_INVALID_EEK);
       }
@@ -3398,9 +3398,9 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
           KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).length())) {
         KMException.throwIt(KMError.STATUS_INVALID_EEK);
       }
-      lastCoseKey = ptr2;
+      prevCoseKey = ptr2;
     }
-    return lastCoseKey;
+    return prevCoseKey;
   }
 
   private static short validateAndExtractPublicKeys(boolean testMode, short arr, byte[] scratchPad, short offset) {
@@ -3512,13 +3512,13 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     // Construct payload.
     short payload =
         KMCose.constructCoseCertPayload(
-            KMCoseKeyTextStringValue.instance(KMInteger.uint_8(KMCose.ISSUER),
+            KMCosePairTextStringTag.instance(KMInteger.uint_8(KMCose.ISSUER),
                 KMTextString.instance(KMCose.TEST_ISSUER_NAME, (short) 0, (short) KMCose.TEST_ISSUER_NAME.length)),
-            KMCoseKeyTextStringValue.instance(KMInteger.uint_8(KMCose.SUBJECT),
+            KMCosePairTextStringTag.instance(KMInteger.uint_8(KMCose.SUBJECT),
                 KMTextString.instance(KMCose.TEST_SUBJECT_NAME, (short) 0, (short) KMCose.TEST_SUBJECT_NAME.length)),
-            KMCoseKeyByteBlobValue.instance(KMNInteger.uint_32(KMCose.SUBJECT_PUBLIC_KEY, (short) 0),
+            KMCosePairByteBlobTag.instance(KMNInteger.uint_32(KMCose.SUBJECT_PUBLIC_KEY, (short) 0),
                 KMByteBlob.instance(scratchPad, offset, lengths[(short) 1])),
-            KMCoseKeyByteBlobValue.instance(KMNInteger.uint_32(KMCose.KEY_USAGE, (short) 0),
+            KMCosePairByteBlobTag.instance(KMNInteger.uint_32(KMCose.KEY_USAGE, (short) 0),
                 KMByteBlob.instance(KMCose.KEY_USAGE_SIGN, (short) 0, (short) KMCose.KEY_USAGE_SIGN.length))
         );
     // lengths[1] temporarily holds the length of encoded cert payload.

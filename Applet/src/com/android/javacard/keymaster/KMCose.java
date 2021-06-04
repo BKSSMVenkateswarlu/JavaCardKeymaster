@@ -245,14 +245,14 @@ public class KMCose {
    * @param extraTags Length of the extra tags to be included in the array.
    * @return instance of KMArray.
    */
-  private static short constructCoseTagValues(short[] tags, short extraTags) {
+  private static short handleCosePairTags(short[] tags, short extraTags) {
     short index = 0;
     // var is used to calculate the length of the array.
     short var = 0;
     while (index < tags.length) {
       if (tags[index + 1] != KMType.INVALID_VALUE) {
         tags[(short) (index + 2)] =
-            buildCoseKeyTagValue((byte) tags[index], tags[(short) (index + 1)]);
+            buildCosePairTag((byte) tags[index], tags[(short) (index + 1)]);
         var++;
       }
       index += 3;
@@ -274,10 +274,10 @@ public class KMCose {
   /**
    * Constructs the COSE_sign1 payload for certificate.
    *
-   * @param issuer       instance of KMCoseKeyTextStringValue which contains issuer value.
-   * @param subject      instance of KMCoseKeyTextStringValue which contains subject value.
-   * @param subPublicKey instance of KMCoseKeyByteBlobValue which contains encoded KMCoseKey.
-   * @param keyUsage     instance of KMCoseKeyByteBlobValue which contains key usage value.
+   * @param issuer       instance of KMCosePairTextStringTag which contains issuer value.
+   * @param subject      instance of KMCosePairTextStringTag which contains subject value.
+   * @param subPublicKey instance of KMCosePairByteBlobTag which contains encoded KMCoseKey.
+   * @param keyUsage     instance of KMCosePairByteBlobTag which contains key usage value.
    * @return instance of KMArray.
    */
   public static short constructCoseCertPayload(short issuer, short subject, short subPublicKey, short keyUsage) {
@@ -306,7 +306,7 @@ public class KMCose {
         KMCose.COSE_LABEL_IV, iv, KMType.INVALID_VALUE,
         KMCose.COSE_LABEL_COSE_KEY, ephemeralKey, KMType.INVALID_VALUE
     };
-    short arrPtr = constructCoseTagValues(coseHeaderTags, (short) 0);
+    short arrPtr = handleCosePairTags(coseHeaderTags, (short) 0);
     return KMCoseHeaders.instance(arrPtr);
   }
 
@@ -394,13 +394,13 @@ public class KMCose {
   }
 
   /**
-   * Constructs the instance of KMCoseKey*Value.
+   * Constructs the instance of KMCosePair*Tag.
    *
    * @param key      value of the key.
    * @param valuePtr instance of one of KMType.
-   * @return instance of KMCoseKey*Value object.
+   * @return instance of KMCosePair*Value object.
    */
-  public static short buildCoseKeyTagValue(byte key, short valuePtr) {
+  public static short buildCosePairTag(byte key, short valuePtr) {
     short type = KMType.getType(valuePtr);
     short keyPtr;
     if (key < 0) {
@@ -410,15 +410,15 @@ public class KMCose {
     }
     switch (type) {
       case KMType.INTEGER_TYPE:
-        return KMCoseKeyIntegerValue.instance(keyPtr, valuePtr);
+        return KMCosePairIntegerTag.instance(keyPtr, valuePtr);
       case KMType.NEG_INTEGER_TYPE:
-        return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
+        return KMCosePairNegIntegerTag.instance(keyPtr, valuePtr);
       case KMType.BYTE_BLOB_TYPE:
-        return KMCoseKeyByteBlobValue.instance(keyPtr, valuePtr);
+        return KMCosePairByteBlobTag.instance(keyPtr, valuePtr);
       case KMType.TEXT_STRING_TYPE:
-        return KMCoseKeyTextStringValue.instance(keyPtr, valuePtr);
+        return KMCosePairTextStringTag.instance(keyPtr, valuePtr);
       case KMType.COSE_KEY_TYPE:
-        return KMCoseKeyCoseKeyValue.instance(keyPtr, valuePtr);
+        return KMCosePairCoseKeyTag.instance(keyPtr, valuePtr);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
@@ -451,10 +451,10 @@ public class KMCose {
         KMCose.COSE_KEY_PUBKEY_Y, pubY, KMType.INVALID_VALUE,
     };
     short extraTag = (short) (testMode ? 1 : 0);
-    short arrPtr = constructCoseTagValues(coseKeyTags, extraTag);
+    short arrPtr = handleCosePairTags(coseKeyTags, extraTag);
     if (testMode) {
       short testKey =
-          KMCoseKeySimpleValue.instance(KMNInteger.uint_32(KMCose.COSE_TEST_KEY, (short) 0),
+          KMCosePairSimpleValueTag.instance(KMNInteger.uint_32(KMCose.COSE_TEST_KEY, (short) 0),
               KMSimpleValue.instance(KMSimpleValue.NULL));
       KMArray.cast(arrPtr).add((short) (KMArray.cast(arrPtr).length() - 1), testKey);
     }

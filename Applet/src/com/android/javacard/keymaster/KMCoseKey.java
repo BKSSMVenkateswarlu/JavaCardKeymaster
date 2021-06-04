@@ -44,10 +44,10 @@ public class KMCoseKey extends KMCoseMap {
   public static short exp() {
     short arrPtr = KMArray.instance((short) 4);
     KMArray arr = KMArray.cast(arrPtr);
-    arr.add((short) 0, KMCoseKeyIntegerValue.exp());
-    arr.add((short) 1, KMCoseKeyNIntegerValue.exp());
-    arr.add((short) 2, KMCoseKeyByteBlobValue.exp());
-    arr.add((short) 3, KMCoseKeySimpleValue.exp());
+    arr.add((short) 0, KMCosePairIntegerTag.exp());
+    arr.add((short) 1, KMCosePairNegIntegerTag.exp());
+    arr.add((short) 2, KMCosePairByteBlobTag.exp());
+    arr.add((short) 3, KMCosePairSimpleValueTag.exp());
     return KMCoseKey.instance(arrPtr);
   }
 
@@ -89,34 +89,34 @@ public class KMCoseKey extends KMCoseMap {
     short tagType;
     boolean found = false;
     while (index < length) {
-      tagType = KMCoseKeyTypeValue.getTagValueType(KMArray.cast(arr).get(index));
+      tagType = KMCosePairTagType.getTagValueType(KMArray.cast(arr).get(index));
       switch (tagType) {
-        case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
-          keyPtr = KMCoseKeyByteBlobValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
-          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
-            valPtr = KMCoseKeyByteBlobValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+        case KMType.COSE_PAIR_BYTE_BLOB_TAG_TYPE:
+          keyPtr = KMCosePairByteBlobTag.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCosePairTagType.getKeyValueShort(keyPtr)) {
+            valPtr = KMCosePairByteBlobTag.cast(KMArray.cast(arr).get(index)).getValuePtr();
             found = true;
           }
           break;
-        case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
-          keyPtr = KMCoseKeyIntegerValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
-          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
-            valPtr = KMCoseKeyIntegerValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+        case KMType.COSE_PAIR_INT_TAG_TYPE:
+          keyPtr = KMCosePairIntegerTag.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCosePairTagType.getKeyValueShort(keyPtr)) {
+            valPtr = KMCosePairIntegerTag.cast(KMArray.cast(arr).get(index)).getValuePtr();
             found = true;
           }
           break;
-        case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
-          keyPtr = KMCoseKeyNIntegerValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
-          if (key == (byte) KMCoseKeyTypeValue.getKeyValueShort(keyPtr)) {
-            valPtr = KMCoseKeyNIntegerValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+        case KMType.COSE_PAIR_NEG_INT_TAG_TYPE:
+          keyPtr = KMCosePairNegIntegerTag.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == (byte) KMCosePairTagType.getKeyValueShort(keyPtr)) {
+            valPtr = KMCosePairNegIntegerTag.cast(KMArray.cast(arr).get(index)).getValuePtr();
             found = true;
           }
           break;
-        case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
-          keyPtr = KMCoseKeySimpleValue.cast(KMArray.cast(arr).get(index)).getKeyPtr();
-          if (key == KMCoseKeyTypeValue.getKeyValueShort(keyPtr) &&
-              significantKey == KMCoseKeyTypeValue.getKeyValueSignificantShort(keyPtr)) {
-            valPtr = KMCoseKeySimpleValue.cast(KMArray.cast(arr).get(index)).getValuePtr();
+        case KMType.COSE_PAIR_SIMPLE_VALUE_TAG_TYPE:
+          keyPtr = KMCosePairSimpleValueTag.cast(KMArray.cast(arr).get(index)).getKeyPtr();
+          if (key == KMCosePairTagType.getKeyValueShort(keyPtr) &&
+              significantKey == KMCosePairTagType.getKeyValueSignificantShort(keyPtr)) {
+            valPtr = KMCosePairSimpleValueTag.cast(KMArray.cast(arr).get(index)).getValuePtr();
             found = true;
           }
           break;

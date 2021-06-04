@@ -5,22 +5,22 @@ import javacard.framework.ISOException;
 import javacard.framework.Util;
 
 /**
- * KMCoseKeyCoseKeyValue represents a key-value type, where key can be KMInteger or KMNInteger and value is
+ * KMCosePairCoseKeyTag represents a key-value type, where key can be KMInteger or KMNInteger and value is
  * KMCOseKey type. struct{byte TAG_TYPE; short length; struct{short COSE_KEY_VALUE_TYPE; short key; short value}}.
  */
-public class KMCoseKeyCoseKeyValue extends KMCoseKeyTypeValue {
+public class KMCosePairCoseKeyTag extends KMCosePairTagType {
 
   public static final byte[] keys = {
       KMCose.COSE_LABEL_COSE_KEY
   };
-  private static KMCoseKeyCoseKeyValue prototype;
+  private static KMCosePairCoseKeyTag prototype;
 
-  private KMCoseKeyCoseKeyValue() {
+  private KMCosePairCoseKeyTag() {
   }
 
-  private static KMCoseKeyCoseKeyValue proto(short ptr) {
+  private static KMCosePairCoseKeyTag proto(short ptr) {
     if (prototype == null) {
-      prototype = new KMCoseKeyCoseKeyValue();
+      prototype = new KMCosePairCoseKeyTag();
     }
     instanceTable[KM_COSE_KEY_COSE_KEY_VAL_OFFSET] = ptr;
     return prototype;
@@ -28,30 +28,30 @@ public class KMCoseKeyCoseKeyValue extends KMCoseKeyTypeValue {
 
   // pointer to an empty instance used as expression
   public static short exp() {
-    short ptr = instance(COSE_KEY_TAG_TYPE, (short) 6);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE);
+    short ptr = instance(COSE_PAIR_TAG_TYPE, (short) 6);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_PAIR_COSE_KEY_TAG_TYPE);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), KMType.INVALID_VALUE);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 4), KMCoseKey.exp());
     return ptr;
   }
 
   public static short instance(short keyPtr, short valuePtr) {
-    if (!isKeyValueValid(KMCoseKeyTypeValue.getKeyValueShort(keyPtr))) {
+    if (!isKeyValueValid(KMCosePairTagType.getKeyValueShort(keyPtr))) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     if (KMType.getType(valuePtr) != COSE_KEY_TYPE) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
-    short ptr = KMType.instance(COSE_KEY_TAG_TYPE, (short) 6);
-    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE);
+    short ptr = KMType.instance(COSE_PAIR_TAG_TYPE, (short) 6);
+    Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE), KMType.COSE_PAIR_COSE_KEY_TAG_TYPE);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 2), keyPtr);
     Util.setShort(heap, (short) (ptr + TLV_HEADER_SIZE + 4), valuePtr);
     return ptr;
   }
 
-  public static KMCoseKeyCoseKeyValue cast(short ptr) {
+  public static KMCosePairCoseKeyTag cast(short ptr) {
     byte[] heap = repository.getHeap();
-    if (heap[ptr] != COSE_KEY_TAG_TYPE) {
+    if (heap[ptr] != COSE_PAIR_TAG_TYPE) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
     // Validate the value pointer.

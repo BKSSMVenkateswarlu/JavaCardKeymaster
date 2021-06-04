@@ -44,11 +44,11 @@ import com.android.javacard.keymaster.KMCose;
 import com.android.javacard.keymaster.KMTextString;
 import com.android.javacard.keymaster.KMMap;
 import com.android.javacard.keymaster.KMCoseKey;
-import com.android.javacard.keymaster.KMCoseKeyByteBlobValue;
-import com.android.javacard.keymaster.KMCoseKeyNIntegerValue;
-import com.android.javacard.keymaster.KMCoseKeyIntegerValue;
+import com.android.javacard.keymaster.KMCosePairByteBlobTag;
+import com.android.javacard.keymaster.KMCosePairNegIntegerTag;
+import com.android.javacard.keymaster.KMCosePairIntegerTag;
 import com.android.javacard.keymaster.KMECPrivateKey;
-import com.android.javacard.keymaster.KMCoseKeyTextStringValue;
+import com.android.javacard.keymaster.KMCosePairTextStringTag;
 import com.android.javacard.keymaster.KMCoseHeaders;
 import com.android.javacard.keymaster.KMVerificationToken;
 import com.licel.jcardsim.smartcardio.CardSimulator;
@@ -1111,7 +1111,7 @@ public class KMFunctionalTest {
     Assert.assertEquals(1, KMArray.cast(params).length());
     short param = KMArray.cast(params).get((short) 0);
     Assert.assertEquals(KMCose.COSE_ALG_AES_GCM_256,
-        KMInteger.cast(KMCoseKeyIntegerValue.cast(param).getValuePtr()).getByte());
+        KMInteger.cast(KMCosePairIntegerTag.cast(param).getValuePtr()).getByte());
     //  2. Validate unprotected header.
     params = KMArray.cast(protectedDataArrPtr).get((short) 1);
     short iv = KMCoseHeaders.cast(params).getIV();
@@ -1311,15 +1311,15 @@ public class KMFunctionalTest {
 
       // Get the public key from the payload.
       short certPayload = KMArray.instance((short) 4);
-      KMArray.cast(certPayload).add((short) 0, KMCoseKeyTextStringValue.exp());
-      KMArray.cast(certPayload).add((short) 1, KMCoseKeyTextStringValue.exp());
-      KMArray.cast(certPayload).add((short) 2, KMCoseKeyByteBlobValue.exp());
-      KMArray.cast(certPayload).add((short) 3, KMCoseKeyByteBlobValue.exp());
+      KMArray.cast(certPayload).add((short) 0, KMCosePairTextStringTag.exp());
+      KMArray.cast(certPayload).add((short) 1, KMCosePairTextStringTag.exp());
+      KMArray.cast(certPayload).add((short) 2, KMCosePairByteBlobTag.exp());
+      KMArray.cast(certPayload).add((short) 3, KMCosePairByteBlobTag.exp());
       short payloadPtr =
           decoder.decode(certPayload, KMByteBlob.cast(payload).getBuffer(), KMByteBlob.cast(payload).getStartOff(),
               KMByteBlob.cast(payload).length());
       short coseKeyPtr = KMArray.cast(payloadPtr).get((short) 2);
-      coseKeyPtr = KMCoseKeyByteBlobValue.cast(coseKeyPtr).getValuePtr();
+      coseKeyPtr = KMCosePairByteBlobTag.cast(coseKeyPtr).getValuePtr();
       coseKeyPtr = decoder.decode(KMCoseKey.exp(), KMByteBlob.cast(coseKeyPtr).getBuffer(),
           KMByteBlob.cast(coseKeyPtr).getStartOff(), KMByteBlob.cast(coseKeyPtr).length());
       prevCoseKey = coseKeyPtr;
@@ -1388,7 +1388,7 @@ public class KMFunctionalTest {
     Assert.assertEquals(1, KMArray.cast(params).length());
     short param = KMArray.cast(params).get((short) 0);
     Assert.assertEquals(KMCose.COSE_ALG_ECDH_ES_HKDF_256,
-        (byte) KMNInteger.cast(KMCoseKeyNIntegerValue.cast(param).getValuePtr()).getShort());
+        (byte) KMNInteger.cast(KMCosePairNegIntegerTag.cast(param).getValuePtr()).getShort());
     //--------------------------------------------
     // Get and validate unprotected parameters inside the recipient structure.
     //--------------------------------------------
@@ -1642,17 +1642,17 @@ public class KMFunctionalTest {
   public void testCoseKey() {
     init();
     // KeyType
-    short keyType = KMCoseKeyIntegerValue.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_TYPE), KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2));
+    short keyType = KMCosePairIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_TYPE), KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2));
     //Alg
-    short alg = KMCoseKeyNIntegerValue.instance(KMInteger.uint_8(KMCose.COSE_KEY_ALGORITHM), KMNInteger.uint_8(KMCose.COSE_ALG_ES256));
+    short alg = KMCosePairNegIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_ALGORITHM), KMNInteger.uint_8(KMCose.COSE_ALG_ES256));
     //curve
-    short curve = KMCoseKeyIntegerValue.instance(KMNInteger.uint_8(KMCose.COSE_KEY_CURVE), KMInteger.uint_8(KMCose.COSE_ECCURVE_256));
+    short curve = KMCosePairIntegerTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_CURVE), KMInteger.uint_8(KMCose.COSE_ECCURVE_256));
     //key_ops
-    short keyops = KMCoseKeyIntegerValue.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_OPS), KMInteger.uint_8(KMCose.COSE_KEY_OP_VERIFY));
+    short keyops = KMCosePairIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_OPS), KMInteger.uint_8(KMCose.COSE_KEY_OP_VERIFY));
     byte[] pubx = new byte[32];
     Util.arrayFillNonAtomic(pubx, (short)0, (short)pubx.length,(byte)0);
     // pubx
-    short pub_x = KMCoseKeyByteBlobValue.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PUBKEY_X),
+    short pub_x = KMCosePairByteBlobTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PUBKEY_X),
         KMByteBlob.instance(pubx, (short) 0, (short) pubx.length));
     short arrPtr = KMArray.instance((short) 5);
     KMArray.cast(arrPtr).add((short)0, keyType);

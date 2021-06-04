@@ -192,9 +192,9 @@ public class KMEncoder {
           short tagType = KMTag.getTagType(exp);
           encodeTag(tagType, exp);
           break;
-        case KMType.COSE_KEY_TAG_TYPE:
-          short coseKeyTagType = KMCoseKeyTypeValue.getTagValueType(exp);
-          encodeCoseKeyTag(coseKeyTagType, exp);
+        case KMType.COSE_PAIR_TAG_TYPE:
+          short cosePairTagType = KMCosePairTagType.getTagValueType(exp);
+          encodeCosePairTag(cosePairTagType, exp);
           break;
         default:
           ISOException.throwIt(ISO7816.SW_DATA_INVALID);
@@ -202,67 +202,67 @@ public class KMEncoder {
     }
   }
 
-  private void encodeCoseKeyIntegerValue(short exp) {
-    KMCoseKeyIntegerValue coseKeyIntVal = KMCoseKeyIntegerValue.cast(exp);
+  private void encodeCosePairIntegerTag(short exp) {
+    KMCosePairIntegerTag cosePairIntTag = KMCosePairIntegerTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeyIntVal.getValuePtr());
-    encode(coseKeyIntVal.getKeyPtr());
+    encode(cosePairIntTag.getValuePtr());
+    encode(cosePairIntTag.getKeyPtr());
   }
 
-  private void encodeCoseKeyByteBlobValue(short exp) {
-    KMCoseKeyByteBlobValue coseKeyByteBlobValue = KMCoseKeyByteBlobValue.cast(exp);
+  private void encodeCosePairByteBlobTag(short exp) {
+    KMCosePairByteBlobTag cosePairByteBlobTag = KMCosePairByteBlobTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeyByteBlobValue.getValuePtr());
-    encode(coseKeyByteBlobValue.getKeyPtr());
+    encode(cosePairByteBlobTag.getValuePtr());
+    encode(cosePairByteBlobTag.getKeyPtr());
   }
 
-  private void encodeCoseKeyCoseKeyValue(short exp) {
-    KMCoseKeyCoseKeyValue coseKeyCoseKeyValue = KMCoseKeyCoseKeyValue.cast(exp);
+  private void encodeCosePairCoseKeyTag(short exp) {
+    KMCosePairCoseKeyTag cosePairCoseKeyTag = KMCosePairCoseKeyTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeyCoseKeyValue.getValuePtr());
-    encode(coseKeyCoseKeyValue.getKeyPtr());
+    encode(cosePairCoseKeyTag.getValuePtr());
+    encode(cosePairCoseKeyTag.getKeyPtr());
   }
 
-  private void encodeCoseKeyTextStringValue(short exp) {
-    KMCoseKeyTextStringValue coseKeyTextStringValue = KMCoseKeyTextStringValue.cast(exp);
+  private void encodeCosePairTextStringTag(short exp) {
+    KMCosePairTextStringTag cosePairTextStringTag = KMCosePairTextStringTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeyTextStringValue.getValuePtr());
-    encode(coseKeyTextStringValue.getKeyPtr());
+    encode(cosePairTextStringTag.getValuePtr());
+    encode(cosePairTextStringTag.getKeyPtr());
   }
 
-  private void encodeCoseKeySimpleValue(short exp) {
-    KMCoseKeySimpleValue coseKeySimpleValue = KMCoseKeySimpleValue.cast(exp);
+  private void encodeCosePairSimpleValueTag(short exp) {
+    KMCosePairSimpleValueTag cosePairSimpleValueTag = KMCosePairSimpleValueTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeySimpleValue.getValuePtr());
-    encode(coseKeySimpleValue.getKeyPtr());
+    encode(cosePairSimpleValueTag.getValuePtr());
+    encode(cosePairSimpleValueTag.getKeyPtr());
   }
 
-  private void encodeCoseKeyNegIntegerValue(short exp) {
-    KMCoseKeyNIntegerValue coseKeyNIntegerValue = KMCoseKeyNIntegerValue.cast(exp);
+  private void encodeCosePairNegIntegerTag(short exp) {
+    KMCosePairNegIntegerTag cosePairNegIntegerTag = KMCosePairNegIntegerTag.cast(exp);
     // push key and value ptr in stack to get encoded.
-    encode(coseKeyNIntegerValue.getValuePtr());
-    encode(coseKeyNIntegerValue.getKeyPtr());
+    encode(cosePairNegIntegerTag.getValuePtr());
+    encode(cosePairNegIntegerTag.getKeyPtr());
   }
 
-  private void encodeCoseKeyTag(short tagType, short exp) {
+  private void encodeCosePairTag(short tagType, short exp) {
     switch (tagType) {
-      case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
-        encodeCoseKeyByteBlobValue(exp);
+      case KMType.COSE_PAIR_BYTE_BLOB_TAG_TYPE:
+        encodeCosePairByteBlobTag(exp);
         return;
-      case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
-        encodeCoseKeyIntegerValue(exp);
+      case KMType.COSE_PAIR_INT_TAG_TYPE:
+        encodeCosePairIntegerTag(exp);
         return;
-      case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
-        encodeCoseKeyNegIntegerValue(exp);
+      case KMType.COSE_PAIR_NEG_INT_TAG_TYPE:
+        encodeCosePairNegIntegerTag(exp);
         return;
-      case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
-        encodeCoseKeySimpleValue(exp);
+      case KMType.COSE_PAIR_SIMPLE_VALUE_TAG_TYPE:
+        encodeCosePairSimpleValueTag(exp);
         return;
-      case KMType.COSE_KEY_TAG_TXT_STR_VALUE_TYPE:
-        encodeCoseKeyTextStringValue(exp);
+      case KMType.COSE_PAIR_TEXT_STR_TAG_TYPE:
+        encodeCosePairTextStringTag(exp);
         return;
-      case KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE:
-        encodeCoseKeyCoseKeyValue(exp);
+      case KMType.COSE_PAIR_COSE_KEY_TAG_TYPE:
+        encodeCosePairCoseKeyTag(exp);
         return;
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);

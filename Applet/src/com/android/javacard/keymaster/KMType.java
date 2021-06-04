@@ -48,15 +48,15 @@ public abstract class KMType {
   public static final byte TEXT_STRING_TYPE = 0x0D;
   public static final byte MAP_TYPE = 0x0E;
   public static final byte COSE_KEY_TYPE = 0x0F;
-  public static final byte COSE_KEY_TAG_TYPE = 0x10;
-  public static final byte COSE_KEY_TAG_INT_VALUE_TYPE = 0x20;
-  public static final byte COSE_KEY_TAG_NINT_VALUE_TYPE = 0x30;
-  public static final byte COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE = 0x40;
-  public static final byte COSE_KEY_TAG_COSE_KEY_VALUE_TYPE = 0x60;
-  public static final byte COSE_KEY_TAG_SIMPLE_VALUE_TYPE = 0x70;
-  public static final byte SIMPLE_VALUE_TYPE = (byte) 0x80;
-  public static final byte COSE_HEADERS_TYPE = (byte) 0x90;
-  public static final byte COSE_KEY_TAG_TXT_STR_VALUE_TYPE = (byte) 0xA0;
+  public static final byte COSE_PAIR_TAG_TYPE = 0x10;
+  public static final byte COSE_PAIR_INT_TAG_TYPE = 0x20;
+  public static final byte COSE_PAIR_NEG_INT_TAG_TYPE = 0x30;
+  public static final byte COSE_PAIR_BYTE_BLOB_TAG_TYPE = 0x40;
+  public static final byte COSE_PAIR_COSE_KEY_TAG_TYPE = 0x60;
+  public static final byte COSE_PAIR_SIMPLE_VALUE_TAG_TYPE = 0x70;
+  public static final byte COSE_PAIR_TEXT_STR_TAG_TYPE = (byte) 0x80;
+  public static final byte SIMPLE_VALUE_TYPE = (byte) 0x90;
+  public static final byte COSE_HEADERS_TYPE = (byte) 0xA0;
   // Tag Types
   public static final short INVALID_TAG = 0x0000;
   public static final short ENUM_TAG = 0x1000;

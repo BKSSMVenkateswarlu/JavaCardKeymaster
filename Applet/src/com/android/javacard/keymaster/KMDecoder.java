@@ -118,9 +118,9 @@ public class KMDecoder {
       case KMType.COSE_KEY_TYPE:
       case KMType.COSE_HEADERS_TYPE:
         return decodeCoseMap(exp);
-      case KMType.COSE_KEY_TAG_TYPE:
-        short tagValueType = KMCoseKeyTypeValue.getTagValueType(exp);
-        return decodeCoseKeyTag(tagValueType, exp);
+      case KMType.COSE_PAIR_TAG_TYPE:
+        short tagValueType = KMCosePairTagType.getTagValueType(exp);
+        return decodeCosePairTag(tagValueType, exp);
       case KMType.TAG_TYPE:
         short tagType = KMTag.getTagType(exp);
         return decodeTag(tagType, exp);
@@ -173,7 +173,7 @@ public class KMDecoder {
     return KMKeyCharacteristics.instance(vals);
   }
 
-  private short decodeCoseKeyKeyType(short exp) {
+  private short decodeCosePairKey(short exp) {
     byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     short keyPtr = (short) 0;
@@ -188,43 +188,43 @@ public class KMDecoder {
     return keyPtr;
   }
 
-  private short decodeCoseKeySimpleValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeySimpleValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeySimpleValue.cast(exp).getValuePtr());
-    return KMCoseKeySimpleValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairSimpleValueTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairSimpleValueTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairSimpleValueTag.cast(exp).getValuePtr());
+    return KMCosePairSimpleValueTag.instance(keyPtr, valuePtr);
   }
 
-  private short decodeCoseKeyIntegerValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyIntegerValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeyIntegerValue.cast(exp).getValuePtr());
-    return KMCoseKeyIntegerValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairIntegerValueTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairIntegerTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairIntegerTag.cast(exp).getValuePtr());
+    return KMCosePairIntegerTag.instance(keyPtr, valuePtr);
   }
 
-  private short decodeCoseKeyNegIntegerValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyNIntegerValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeyNIntegerValue.cast(exp).getValuePtr());
-    return KMCoseKeyNIntegerValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairNegIntegerTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairNegIntegerTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairNegIntegerTag.cast(exp).getValuePtr());
+    return KMCosePairNegIntegerTag.instance(keyPtr, valuePtr);
   }
 
-  private short decodeCoseKeyTxtStringValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyTextStringValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeyTextStringValue.cast(exp).getValuePtr());
-    return KMCoseKeyTextStringValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairTxtStringTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairTextStringTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairTextStringTag.cast(exp).getValuePtr());
+    return KMCosePairTextStringTag.instance(keyPtr, valuePtr);
   }
 
-  private short decodeCoseKeyCoseKeyValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyCoseKeyValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeyCoseKeyValue.cast(exp).getValuePtr());
-    return KMCoseKeyCoseKeyValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairCoseKeyTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairCoseKeyTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairCoseKeyTag.cast(exp).getValuePtr());
+    return KMCosePairCoseKeyTag.instance(keyPtr, valuePtr);
   }
 
-  private short decodeCoseKeyByteBlobValue(short exp) {
-    short keyPtr = decodeCoseKeyKeyType((KMCoseKeyByteBlobValue.cast(exp).getKeyPtr()));
-    short valuePtr = decode(KMCoseKeyByteBlobValue.cast(exp).getValuePtr());
-    return KMCoseKeyByteBlobValue.instance(keyPtr, valuePtr);
+  private short decodeCosePairByteBlobTag(short exp) {
+    short keyPtr = decodeCosePairKey((KMCosePairByteBlobTag.cast(exp).getKeyPtr()));
+    short valuePtr = decode(KMCosePairByteBlobTag.cast(exp).getValuePtr());
+    return KMCosePairByteBlobTag.instance(keyPtr, valuePtr);
   }
 
-  private short peekCoseKeyTagType() {
+  private short peekCosePairTagType() {
     byte[] buffer = (byte[]) bufferRef[0];
     short startOff = scratchBuf[START_OFFSET];
     // Cose Key should be always either UINT or Negative int
@@ -249,35 +249,35 @@ public class KMDecoder {
     short majorType = (short) (buffer[(short) (startOff + increment)] & MAJOR_TYPE_MASK);
     short tagValueType = 0;
     if (majorType == BYTES_TYPE) {
-      tagValueType = KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE;
+      tagValueType = KMType.COSE_PAIR_BYTE_BLOB_TAG_TYPE;
     } else if (majorType == UINT_TYPE) {
-      tagValueType = KMType.COSE_KEY_TAG_INT_VALUE_TYPE;
+      tagValueType = KMType.COSE_PAIR_INT_TAG_TYPE;
     } else if (majorType == NEG_INT_TYPE) {
-      tagValueType = KMType.COSE_KEY_TAG_NINT_VALUE_TYPE;
+      tagValueType = KMType.COSE_PAIR_NEG_INT_TAG_TYPE;
     } else if (majorType == MAP_TYPE) {
-      tagValueType = KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE;
+      tagValueType = KMType.COSE_PAIR_COSE_KEY_TAG_TYPE;
     } else if (majorType == SIMPLE_VALUE_TYPE) {
-      tagValueType = KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE;
+      tagValueType = KMType.COSE_PAIR_SIMPLE_VALUE_TAG_TYPE;
     } else {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
     return tagValueType;
   }
 
-  private short decodeCoseKeyTag(short tagValueType, short exp) {
+  private short decodeCosePairTag(short tagValueType, short exp) {
     switch (tagValueType) {
-      case KMType.COSE_KEY_TAG_BYTE_BLOB_VALUE_TYPE:
-        return decodeCoseKeyByteBlobValue(exp);
-      case KMType.COSE_KEY_TAG_NINT_VALUE_TYPE:
-        return decodeCoseKeyNegIntegerValue(exp);
-      case KMType.COSE_KEY_TAG_INT_VALUE_TYPE:
-        return decodeCoseKeyIntegerValue(exp);
-      case KMType.COSE_KEY_TAG_SIMPLE_VALUE_TYPE:
-        return decodeCoseKeySimpleValue(exp);
-      case KMType.COSE_KEY_TAG_COSE_KEY_VALUE_TYPE:
-        return decodeCoseKeyCoseKeyValue(exp);
-      case KMType.COSE_KEY_TAG_TXT_STR_VALUE_TYPE:
-        return decodeCoseKeyTxtStringValue(exp);
+      case KMType.COSE_PAIR_BYTE_BLOB_TAG_TYPE:
+        return decodeCosePairByteBlobTag(exp);
+      case KMType.COSE_PAIR_NEG_INT_TAG_TYPE:
+        return decodeCosePairNegIntegerTag(exp);
+      case KMType.COSE_PAIR_INT_TAG_TYPE:
+        return decodeCosePairIntegerValueTag(exp);
+      case KMType.COSE_PAIR_SIMPLE_VALUE_TAG_TYPE:
+        return decodeCosePairSimpleValueTag(exp);
+      case KMType.COSE_PAIR_COSE_KEY_TAG_TYPE:
+        return decodeCosePairCoseKeyTag(exp);
+      case KMType.COSE_PAIR_TEXT_STR_TAG_TYPE:
+        return decodeCosePairTxtStringTag(exp);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
@@ -293,7 +293,7 @@ public class KMDecoder {
     short index = 0;
     boolean tagFound;
     short tagInd;
-    short coseKeyTagType;
+    short cosePairTagType;
     short tagClass;
     short allowedType;
     short obj;
@@ -302,12 +302,12 @@ public class KMDecoder {
     while (index < payloadLength) {
       tagFound = false;
       tagInd = 0;
-      coseKeyTagType = peekCoseKeyTagType();
+      cosePairTagType = peekCosePairTagType();
       // Check against the allowed tags ...
       while (tagInd < length) {
         tagClass = KMArray.cast(allowedKeyPairs).get(tagInd);
-        allowedType = KMCoseKeyTypeValue.getTagValueType(tagClass);
-        if (allowedType == coseKeyTagType) {
+        allowedType = KMCosePairTagType.getTagValueType(tagClass);
+        if (allowedType == cosePairTagType) {
           obj = decode(tagClass);
           KMArray.cast(vals).add(index, obj);
           tagFound = true;

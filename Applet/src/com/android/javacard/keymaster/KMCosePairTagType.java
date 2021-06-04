@@ -25,12 +25,13 @@ import javacard.framework.Util;
  * This is basically a map containing key value pairs. The label for the key can be (uint / int / tstr) and
  * the value can be of any type. But this class is confined to support only key and value types which are
  * required for remote key provisioning. So keys of type (int / uint) and values of type (int / uint / simple / bstr)
- * only are supported. The structure representing all the sub classes of KMCoseKeyTypeValue is as follows:
- * KM_COSE_KEY_TAG_TYPE(1byte), Length(2 bytes), COSE_KEY_TAG_*_VALUE_TYPE(2 bytes), Key(2 bytes), Value(2 bytes).
+ * only are supported. The structure representing all the sub classes of KMCosePairTagType is as follows:
+ * KM_COSE_PAIR_TAG_TYPE(1byte), Length(2 bytes), COSE_PAIR_*_TAG_TYPE(2 bytes), Key(2 bytes), Value(2 bytes).
  * Key can be either KMInteger or KMNInteger and Value can be either KMIntger or KMNinteger or KMSimpleValue
- * or KMByteBlob or KMTextString. Each subclass of KMCoseKeyTypeValue is named after their corresponding value types.
+ * or KMByteBlob or KMTextString or KMCoseKey. Each subclass of KMCosePairTagType is named after their corresponding
+ * value type of the Cose pair.
  */
-public abstract class KMCoseKeyTypeValue extends KMType {
+public abstract class KMCosePairTagType extends KMType {
 
   /**
    * Below table represents the allowed values for a key. The maximum length of the key
