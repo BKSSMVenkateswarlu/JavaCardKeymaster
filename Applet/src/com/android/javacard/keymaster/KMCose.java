@@ -429,14 +429,14 @@ public class KMCose {
    * Constructs the cose key based on input parameters supplied. All the parameters must be instantiated from
    * either KMInteger or KMNInteger or KMByteblob types.
    *
-   * @param keyType  instance of one of KMType which holds key type value .
-   * @param keyId    instance of one of KMType which holds key identifier value.
-   * @param keyAlg   instance of one of KMType which holds key algorithm value.
-   * @param keyOps   instance of one of KMType which holds key operations value.
-   * @param curve    instance of one of KMType which holds EC curve.
-   * @param pubX     instance of one of KMType which holds EC public key's x value.
-   * @param pubY     instance of one of KMType which holds EC public key's y value.
-   * @param testMode tells if the current key is for test mode or production mode.
+   * @param keyType  instance of KMInteger/KMNInteger which holds valid COSE key types.
+   * @param keyId    instance of KMByteBlob which holds key identifier value.
+   * @param keyAlg   instance of KMInteger/KMNInteger which holds valid COSE key algorithm.
+   * @param keyOps   instance of KMInteger/KMNInteger which holds valid COSE key operations.
+   * @param curve    instance of KMInteger/KMNInteger which holds valid COSE EC curve.
+   * @param pubX     instance of KMByteBlob which holds EC public key's x value.
+   * @param pubY     instance of KMByteBlob which holds EC public key's y value.
+   * @param testMode flag which identifies whether to construct test key or production key.
    * @return instance of the KMCoseKey object.
    */
   public static short constructCoseKey(short keyType, short keyId, short keyAlg, short keyOps, short curve,

@@ -195,6 +195,11 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   protected static short[] tmpVariables;
   protected static short[] data;
   protected static byte provisionStatus = NOT_PROVISIONED;
+  // Device Info
+  public static final byte[] BRAND = {0x62, 0x72, 0x61, 0x6E, 0x64};
+  public static final byte[] MANUFACTURER = {0x6D, 0x61, 0x6E, 0x75, 0x66, 0x61, 0x63, 0x74, 0x75, 0x72, 0x65, 0x72};
+  public static final byte[] PRODUCT = {0x70, 0x72, 0x6F, 0x64, 0x75, 0x63, 74};
+  public static final byte[] MODEL = {0x6D, 0x6F, 0x64, 0x65, 0x6C};
   // Hard-coded set of acceptable public keys that can act as roots of EEK chains.
   public static final byte[][] AUTHORIZED_EEK_ROOTS =
   {
@@ -3604,6 +3609,12 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
 
   private static short createDeviceInfo() {
     // TODO
+    short brand = repository.getAttId(KMRepository.ATT_ID_BRAND);
+    short manufacturer = repository.getAttId(KMRepository.ATT_ID_MANUFACTURER);
+    short product = repository.getAttId(KMRepository.ATT_ID_PRODUCT);
+    short model = repository.getAttId(KMRepository.ATT_ID_MODEL);
+    // TODO vb_state, bootloader_state, os_version, system_patch_level
+    // TODO vendor_patch_level, boot_patch_level
     return KMMap.instance((short) 0);
   }
 
