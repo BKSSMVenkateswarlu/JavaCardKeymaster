@@ -74,6 +74,7 @@ public class KMJCardSimulator implements KMSEProvider {
   public static final short ENTROPY_POOL_SIZE = 16; // simulator does not support 256 bit aes keys
   public static final byte[] aesICV = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   private static final short CERT_CHAIN_MAX_SIZE = 2500;//First 2 bytes for length.
+  private static final short ADDITIONAL_CERT_CHAIN_MAX_SIZE = 500;//First 2 bytes for length.
   private static final short RSA_KEY_SIZE = 256;
 
 
@@ -88,8 +89,10 @@ public class KMJCardSimulator implements KMSEProvider {
   private static byte[] entropyPool;
   private static byte[] rndNum;
   private byte[] certificateChain;
+  private byte[] additionalCertChain;
   private KMAESKey masterKey;
   private KMECPrivateKey attestationKey;
+  private KMECDeviceUniqueKey deviceUniqueKey;
   private KMHmacKey preSharedKey;
 
   private static KMJCardSimulator jCardSimulator = null;
@@ -118,6 +121,7 @@ public class KMJCardSimulator implements KMSEProvider {
     // various ciphers
     //Allocate buffer for certificate chain.
     certificateChain = new byte[CERT_CHAIN_MAX_SIZE];
+    additionalCertChain = new byte[ADDITIONAL_CERT_CHAIN_MAX_SIZE];
     jCardSimulator = this;
   }
 
@@ -165,10 +169,10 @@ public class KMJCardSimulator implements KMSEProvider {
     short keysize = (short) (length * 8);
     if (keysize == 128) {
       key = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_128, false);
-      key.setKey(buf, (short) startOff);
+      key.setKey(buf, startOff);
     } else if (keysize == 256) {
       key = (AESKey) KeyBuilder.buildKey(KeyBuilder.TYPE_AES, KeyBuilder.LENGTH_AES_256, false);
-      key.setKey(buf, (short) startOff);
+      key.setKey(buf, startOff);
     }
     return key;
   }
@@ -303,7 +307,7 @@ public class KMJCardSimulator implements KMSEProvider {
 
 
   public HMACKey createHMACKey(byte[] secretBuffer, short secretOff, short secretLength) {
-    HMACKey key = null;
+    HMACKey key;
     key = (HMACKey) KeyBuilder.buildKey(KeyBuilder.TYPE_HMAC,
         KeyBuilder.LENGTH_HMAC_SHA_256_BLOCK_64, false);
     key.setKey(secretBuffer, secretOff, secretLength);
@@ -731,7 +735,7 @@ public class KMJCardSimulator implements KMSEProvider {
                                           byte[] secret, short secretStart, short secretLen,
                                           byte[] modBuffer, short modOff, short modLength) {
     // Convert byte arrays into keys
-    byte[] exp = null;
+    byte[] exp;
     byte[] mod = new byte[modLength];
     if (secret != null) {
       exp = new byte[secretLen];
@@ -748,7 +752,7 @@ public class KMJCardSimulator implements KMSEProvider {
     try {
       KeyFactory kf = KeyFactory.getInstance("RSA");
       // Create cipher with oaep padding
-      OAEPParameterSpec oaepSpec = null;
+      OAEPParameterSpec oaepSpec;
       if (digest == KMType.SHA2_256) {
         oaepSpec = new OAEPParameterSpec("SHA-256", "MGF1",
             MGF1ParameterSpec.SHA1, PSource.PSpecified.DEFAULT);
@@ -1230,6 +1234,18 @@ public class KMJCardSimulator implements KMSEProvider {
   }
 
   @Override
+  public short readAdditionalCertChain(byte[] buf, short offset) {
+    short len = Util.getShort(additionalCertChain, (short) 0);
+    Util.arrayCopyNonAtomic(additionalCertChain, (short) 2, buf, offset, len);
+    return len;
+  }
+
+  @Override
+  public short getAdditionalCertChainLength() {
+    return Util.getShort(additionalCertChain, (short) 0);
+  }
+
+  @Override
   public short getCertificateChainLength() {
     return Util.getShort(certificateChain, (short) 0);
   }
@@ -1249,9 +1265,9 @@ public class KMJCardSimulator implements KMSEProvider {
   }
 
   @Override
-  public short ecSign256(byte[] privBuf, short privBufStart, short privBufLen, byte[] inputDataBuf, short inputDataStart,
+  public short ecSign256(KMDeviceUniqueKey deviceUniqueKey, byte[] inputDataBuf, short inputDataStart,
                          short inputDataLength, byte[] outputDataBuf, short outputDataStart) {
-    ECPrivateKey key = createEcKey(privBuf, privBufStart, privBufLen);
+    ECPrivateKey key = ((KMECDeviceUniqueKey) deviceUniqueKey).getPrivateKey();
     Signature signer = Signature
         .getInstance(Signature.ALG_ECDSA_SHA_256, false);
     signer.init(key, Signature.MODE_SIGN);
@@ -1261,8 +1277,8 @@ public class KMJCardSimulator implements KMSEProvider {
 
   @Override
   public boolean ecVerify256(byte[] pubKey, short pubKeyOffset, short pubKeyLen, byte[] inputDataBuf,
-                           short inputDataStart, short inputDataLength, byte[] signatureDataBuf,
-                           short signatureDataStart, short signatureDataLen) {
+                             short inputDataStart, short inputDataLength, byte[] signatureDataBuf,
+                             short signatureDataStart, short signatureDataLen) {
 
     KeyPair ecKeyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
     ECPublicKey ecPublicKey = (ECPublicKey) ecKeyPair.getPublic();
@@ -1279,6 +1295,25 @@ public class KMJCardSimulator implements KMSEProvider {
   public void clearCertificateChain() {
     JCSystem.beginTransaction();
     Util.arrayFillNonAtomic(certificateChain, (short) 0, CERT_CHAIN_MAX_SIZE, (byte) 0);
+    JCSystem.commitTransaction();
+  }
+
+  @Override
+  public void persistAdditionalCertChain(byte[] buf, short offset, short len) {
+    // Input buffer contains encoded additional certificate chain as shown below.
+    //    AdditionalDKSignatures = {
+    //      + SignerName => DKCertChain
+    //    }
+    //    SignerName = tstr
+    //    DKCertChain = [
+    //      2* Certificate // Root -> Leaf. Root is the vendo r
+    //            // self-signed cert, leaf contains DK_pu b
+    //    ]
+    //    Certificate = COSE_Sign1 of a public key
+    JCSystem.beginTransaction();
+    Util.setShort(additionalCertChain, (short) 0, (short) len);
+    Util.arrayCopyNonAtomic(buf, offset, additionalCertChain,
+        (short) 2, len);
     JCSystem.commitTransaction();
   }
 
@@ -1367,6 +1402,30 @@ public class KMJCardSimulator implements KMSEProvider {
     }
     attestationKey.setS(keyData, offset, length);
     return (KMAttestationKey) attestationKey;
+  }
+
+  @Override
+  public KMDeviceUniqueKey createDeviceUniqueKey(boolean testMode, byte[] pubKey, short pubKeyOff, short pubKeyLen,
+                                                 byte[] privKey, short privKeyOff, short privKeyLen) {
+    KMECDeviceUniqueKey ecUniqueKey;
+    if (testMode || (deviceUniqueKey == null)) {
+      // Strongbox supports only P-256 curve for EC key.
+      KeyPair ecKeyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
+      ecUniqueKey = new KMECDeviceUniqueKey(ecKeyPair);
+      ecUniqueKey.setS(privKey, privKeyOff, privKeyLen);
+      ecUniqueKey.setW(pubKey, pubKeyOff, pubKeyLen);
+      if (!testMode) {
+        deviceUniqueKey = ecUniqueKey;
+      }
+    } else {
+      ecUniqueKey = deviceUniqueKey;
+    }
+    return ecUniqueKey;
+  }
+
+  @Override
+  public KMDeviceUniqueKey getDeviceUniqueKey() {
+    return (KMDeviceUniqueKey) deviceUniqueKey;
   }
 
   @Override

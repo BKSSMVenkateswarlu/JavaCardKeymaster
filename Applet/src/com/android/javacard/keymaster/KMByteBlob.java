@@ -119,10 +119,7 @@ public class KMByteBlob extends KMType {
   }
 
   public boolean isValid() {
-    if (length() == 0) {
-      return false;
-    }
-    return true;
+    return (length() != 0);
   }
 
   public void decrementLength(short len) {
@@ -133,5 +130,10 @@ public class KMByteBlob extends KMType {
 
   protected short getBaseOffset() {
     return instanceTable[KM_BYTE_BLOB_OFFSET];
+  }
+
+  public short convertAsTextString() {
+    heap[getBaseOffset()] = TEXT_STRING_TYPE;
+    return getBaseOffset();
   }
 }

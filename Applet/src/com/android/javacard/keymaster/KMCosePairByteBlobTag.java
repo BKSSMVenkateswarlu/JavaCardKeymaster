@@ -31,6 +31,7 @@ public class KMCosePairByteBlobTag extends KMCosePairTagType {
   public static final byte[][] keys = {
       {0, 0, 0, KMCose.COSE_KEY_PUBKEY_X},
       {0, 0, 0, KMCose.COSE_KEY_PUBKEY_Y},
+      {0, 0, 0, KMCose.COSE_KEY_PRIV_KEY},
       {0, 0, 0, KMCose.COSE_LABEL_IV},
       {0, 0, 0, KMCose.COSE_LABEL_KEYID},
       {0, 0, 0, KMCose.COSE_KEY_KEY_ID},

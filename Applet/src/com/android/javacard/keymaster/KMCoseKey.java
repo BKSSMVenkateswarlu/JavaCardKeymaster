@@ -150,6 +150,12 @@ public class KMCoseKey extends KMCoseMap {
     return (short) (pubKeyOff - baseOffset);
   }
 
+  public short getPrivateKey(byte[] priv, short privOff) {
+    short ptr = getValueType(KMCose.COSE_KEY_PRIV_KEY, KMType.INVALID_VALUE);
+    Util.arrayCopy(KMByteBlob.cast(ptr).getBuffer(), KMByteBlob.cast(ptr).getStartOff(),
+        priv, privOff, KMByteBlob.cast(ptr).length());
+    return KMByteBlob.cast(ptr).length();
+  }
 
   public boolean isTestKey() {
     short ptr =
@@ -157,7 +163,10 @@ public class KMCoseKey extends KMCoseMap {
             Util.getShort(KMCose.COSE_TEST_KEY, (short) 2), // LSB
             Util.getShort(KMCose.COSE_TEST_KEY, (short) 0) // MSB (Significant)
         );
-    return KMSimpleValue.cast(ptr).getValue() == KMSimpleValue.NULL;
+    boolean isTestKey = false;
+    if (ptr != 0)
+      isTestKey = (KMSimpleValue.cast(ptr).getValue() == KMSimpleValue.NULL);
+    return isTestKey;
   }
 
   /**
@@ -218,8 +227,9 @@ public class KMCoseKey extends KMCoseMap {
     return valid;
   }
 
+  @Override
   public void canonicalize() {
-    // TODO
+    KMCoseMap.canonicalize(getVals());
   }
 
 }

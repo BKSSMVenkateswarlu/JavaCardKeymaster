@@ -242,10 +242,10 @@ public class KMCose {
    * Constructs array based on the tag values provided.
    *
    * @param tags      array of tag values to be constructed.
-   * @param extraTags Length of the extra tags to be included in the array.
+   * @param includeTestMode  flag which indicates if TEST_COSE_KEY should be included or not.
    * @return instance of KMArray.
    */
-  private static short handleCosePairTags(short[] tags, short extraTags) {
+  private static short handleCosePairTags(short[] tags, boolean includeTestMode) {
     short index = 0;
     // var is used to calculate the length of the array.
     short var = 0;
@@ -257,7 +257,7 @@ public class KMCose {
       }
       index += 3;
     }
-    var += extraTags;
+    var += includeTestMode ? 1 : 0;
     short arrPtr = KMArray.instance(var);
     index = 0;
     // var is used to index the array.
@@ -286,6 +286,7 @@ public class KMCose {
     KMArray.cast(certPayload).add((short) 1, subject);
     KMArray.cast(certPayload).add((short) 2, subPublicKey);
     KMArray.cast(certPayload).add((short) 3, keyUsage);
+    KMCoseMap.canonicalize(certPayload);
     return certPayload;
   }
 
@@ -306,8 +307,10 @@ public class KMCose {
         KMCose.COSE_LABEL_IV, iv, KMType.INVALID_VALUE,
         KMCose.COSE_LABEL_COSE_KEY, ephemeralKey, KMType.INVALID_VALUE
     };
-    short arrPtr = handleCosePairTags(coseHeaderTags, (short) 0);
-    return KMCoseHeaders.instance(arrPtr);
+    short ptr = handleCosePairTags(coseHeaderTags, false);
+    ptr =  KMCoseHeaders.instance(ptr);
+    KMCoseHeaders.cast(ptr).canonicalize();
+    return ptr;
   }
 
   /**
@@ -436,11 +439,12 @@ public class KMCose {
    * @param curve    instance of KMInteger/KMNInteger which holds valid COSE EC curve.
    * @param pubX     instance of KMByteBlob which holds EC public key's x value.
    * @param pubY     instance of KMByteBlob which holds EC public key's y value.
-   * @param testMode flag which identifies whether to construct test key or production key.
+   * @param priv     instance of KMByteBlob which holds EC private value.
+   * @param includeTestKey flag which identifies whether to construct test key or production key.
    * @return instance of the KMCoseKey object.
    */
   public static short constructCoseKey(short keyType, short keyId, short keyAlg, short keyOps, short curve,
-                                       short pubX, short pubY, boolean testMode) {
+                                       short pubX, short pubY, short priv, boolean includeTestKey) {
     short[] coseKeyTags = {
         KMCose.COSE_KEY_KEY_TYPE, keyType, KMType.INVALID_VALUE,
         KMCose.COSE_KEY_KEY_ID, keyId, KMType.INVALID_VALUE,
@@ -449,16 +453,18 @@ public class KMCose {
         KMCose.COSE_KEY_CURVE, curve, KMType.INVALID_VALUE,
         KMCose.COSE_KEY_PUBKEY_X, pubX, KMType.INVALID_VALUE,
         KMCose.COSE_KEY_PUBKEY_Y, pubY, KMType.INVALID_VALUE,
+        KMCose.COSE_KEY_PRIV_KEY, priv, KMType.INVALID_VALUE
     };
-    short extraTag = (short) (testMode ? 1 : 0);
-    short arrPtr = handleCosePairTags(coseKeyTags, extraTag);
-    if (testMode) {
+    short arrPtr = handleCosePairTags(coseKeyTags, includeTestKey);
+    if (includeTestKey) {
       short testKey =
           KMCosePairSimpleValueTag.instance(KMNInteger.uint_32(KMCose.COSE_TEST_KEY, (short) 0),
               KMSimpleValue.instance(KMSimpleValue.NULL));
       KMArray.cast(arrPtr).add((short) (KMArray.cast(arrPtr).length() - 1), testKey);
     }
-    return KMCoseKey.instance(arrPtr);
+    arrPtr = KMCoseKey.instance(arrPtr);
+    KMCoseKey.cast(arrPtr).canonicalize();
+    return arrPtr;
   }
 
   /**

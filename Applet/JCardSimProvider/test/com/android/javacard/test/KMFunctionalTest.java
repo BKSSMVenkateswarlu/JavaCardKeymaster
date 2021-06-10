@@ -16,41 +16,7 @@
 
 package com.android.javacard.test;
 
-import com.android.javacard.keymaster.KMArray;
-import com.android.javacard.keymaster.KMBoolTag;
-import com.android.javacard.keymaster.KMByteBlob;
-import com.android.javacard.keymaster.KMByteTag;
-import com.android.javacard.keymaster.KMJCardSimApplet;
-import com.android.javacard.keymaster.KMJCardSimulator;
-import com.android.javacard.keymaster.KMSEProvider;
-import com.android.javacard.keymaster.KMDecoder;
-import com.android.javacard.keymaster.KMEncoder;
-import com.android.javacard.keymaster.KMEnum;
-import com.android.javacard.keymaster.KMEnumArrayTag;
-import com.android.javacard.keymaster.KMEnumTag;
-import com.android.javacard.keymaster.KMError;
-import com.android.javacard.keymaster.KMHardwareAuthToken;
-import com.android.javacard.keymaster.KMHmacSharingParameters;
-import com.android.javacard.keymaster.KMInteger;
-import com.android.javacard.keymaster.KMIntegerTag;
-import com.android.javacard.keymaster.KMKeyCharacteristics;
-import com.android.javacard.keymaster.KMKeyParameters;
-import com.android.javacard.keymaster.KMKeymasterApplet;
-import com.android.javacard.keymaster.KMRepository;
-import com.android.javacard.keymaster.KMType;
-import com.android.javacard.keymaster.KMSimpleValue;
-import com.android.javacard.keymaster.KMNInteger;
-import com.android.javacard.keymaster.KMCose;
-import com.android.javacard.keymaster.KMTextString;
-import com.android.javacard.keymaster.KMMap;
-import com.android.javacard.keymaster.KMCoseKey;
-import com.android.javacard.keymaster.KMCosePairByteBlobTag;
-import com.android.javacard.keymaster.KMCosePairNegIntegerTag;
-import com.android.javacard.keymaster.KMCosePairIntegerTag;
-import com.android.javacard.keymaster.KMECPrivateKey;
-import com.android.javacard.keymaster.KMCosePairTextStringTag;
-import com.android.javacard.keymaster.KMCoseHeaders;
-import com.android.javacard.keymaster.KMVerificationToken;
+import com.android.javacard.keymaster.*;
 import com.licel.jcardsim.smartcardio.CardSimulator;
 import com.licel.jcardsim.utils.AIDUtil;
 
@@ -107,6 +73,8 @@ public class KMFunctionalTest {
   private static final byte INS_LOCK_PROVISIONING_CMD = INS_BEGIN_KM_CMD + 7; //0x07
   private static final byte INS_GET_PROVISION_STATUS_CMD = INS_BEGIN_KM_CMD + 8; //0x08
   private static final byte INS_SET_VERSION_PATCHLEVEL_CMD = INS_BEGIN_KM_CMD + 9; //0x09
+  private static final byte INS_PROVISION_DEVICE_UNIQUE_KEY_CMD = INS_BEGIN_KM_CMD + 10; //0x0A
+  private static final byte INS_PROVISION_ADDITIONAL_CERT_CHAIN_CMD = INS_BEGIN_KM_CMD + 11; //0x0B
   // Top 32 commands are reserved for provisioning.
   private static final byte INS_END_KM_PROVISION_CMD = 0x20;
 
@@ -702,11 +670,12 @@ public class KMFunctionalTest {
     provisionCertificateParams(simulator);
     provisionSharedSecret(simulator);
     provisionAttestIds(simulator);
+    provisionDeviceUniqueKeyAndCertChain();
     // set bootup parameters
     setBootParams(simulator, (short) BOOT_PATCH_LEVEL);
     // set android system properties
     setAndroidOSSystemProperties(simulator, (short) OS_VERSION, (short) OS_PATCH_LEVEL,
-      (short) VENDOR_PATCH_LEVEL);
+        (short) VENDOR_PATCH_LEVEL);
     provisionLocked(simulator);
   }
 
@@ -744,12 +713,12 @@ public class KMFunctionalTest {
     init();
     short ptr = KMArray.instance((short) 3);
     int a = 0xF0000056;
-    byte[] a_b1 = {(byte)0xF0, 0x00, 0x00, 0x56};
-    KMArray.cast(ptr).add((short) 0, KMNInteger.uint_32(a_b1, (short)0));
-    byte[] a_b2 = new byte[] {(byte)0xF0, 0x00, 0x01, 0x56};
-    KMArray.cast(ptr).add((short) 1, KMNInteger.uint_32(a_b2, (short)0));
-    byte[] a_b3 = new byte[] {(byte)0xF0, 0x10, 0x01, 0x56};
-    KMArray.cast(ptr).add((short) 2, KMNInteger.uint_32(a_b3, (short)0));
+    byte[] a_b1 = {(byte) 0xF0, 0x00, 0x00, 0x56};
+    KMArray.cast(ptr).add((short) 0, KMNInteger.uint_32(a_b1, (short) 0));
+    byte[] a_b2 = new byte[]{(byte) 0xF0, 0x00, 0x01, 0x56};
+    KMArray.cast(ptr).add((short) 1, KMNInteger.uint_32(a_b2, (short) 0));
+    byte[] a_b3 = new byte[]{(byte) 0xF0, 0x10, 0x01, 0x56};
+    KMArray.cast(ptr).add((short) 2, KMNInteger.uint_32(a_b3, (short) 0));
     byte[] blob = new byte[256];
     short len = encoder.encode(ptr, blob, (short) 0);
 
@@ -757,27 +726,27 @@ public class KMFunctionalTest {
     KMArray.cast(ptr).add((short) 0, KMNInteger.exp());
     KMArray.cast(ptr).add((short) 1, KMNInteger.exp());
     KMArray.cast(ptr).add((short) 2, KMNInteger.exp());
-    ptr = decoder.decode(ptr, blob, (short)0, len);
+    ptr = decoder.decode(ptr, blob, (short) 0, len);
     short a_b1_ptr = KMArray.cast(ptr).get((short) 0);
     Assert.assertEquals(0,
-    Util.arrayCompare(a_b1, (short)0,
-        KMNInteger.cast(a_b1_ptr).getBuffer(),
-        KMNInteger.cast(a_b1_ptr).getStartOff(), (short) 4));
+        Util.arrayCompare(a_b1, (short) 0,
+            KMNInteger.cast(a_b1_ptr).getBuffer(),
+            KMNInteger.cast(a_b1_ptr).getStartOff(), (short) 4));
     short a_b2_ptr = KMArray.cast(ptr).get((short) 1);
     Assert.assertEquals(0,
-        Util.arrayCompare(a_b2, (short)0,
+        Util.arrayCompare(a_b2, (short) 0,
             KMNInteger.cast(a_b2_ptr).getBuffer(),
             KMNInteger.cast(a_b2_ptr).getStartOff(), (short) 4));
     short a_b3_ptr = KMArray.cast(ptr).get((short) 2);
     Assert.assertEquals(0,
-        Util.arrayCompare(a_b3, (short)0,
+        Util.arrayCompare(a_b3, (short) 0,
             KMNInteger.cast(a_b3_ptr).getBuffer(),
             KMNInteger.cast(a_b3_ptr).getStartOff(), (short) 4));
     cleanUp();
   }
 
   private short generateCoseMac0Mac(byte[] macKey, short macKeyOff, short macKeyLen, short extAad, short payload,
-                                          short protectedHeader, byte[] scratchpad, short offset) {
+                                    short protectedHeader, byte[] scratchpad, short offset) {
     if (macKeyLen == 0) {
       return 0;
     }
@@ -807,7 +776,7 @@ public class KMFunctionalTest {
   }
 
   private short constructCoseMac0(byte[] macKey, short macKeyOff, short macKeyLen, short extAad, short payload,
-                                         byte[] scratchpad, short offset) {
+                                  byte[] scratchpad, short offset) {
     // Prepare protected header.
 //    short mapPtr = KMMap.instance((short) 1);
 //    KMMap.cast(mapPtr).add((short) 0, KMInteger.uint_8(KMCose.COSE_LABEL_ALGORITHM), KMInteger.uint_8(KMCose.COSE_ALG_HMAC_256));
@@ -916,6 +885,7 @@ public class KMFunctionalTest {
               KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
               xPtr,
               yPtr,
+              KMType.INVALID_VALUE,
               testMode);
       byte[] scratchpad = new byte[200];
       short coseKeyEncodedLen = encoder.encode(coseKey, scratchpad, (short) 0);
@@ -980,14 +950,166 @@ public class KMFunctionalTest {
   }
 
   private short getCoseKeyFromCoseMac(short coseMacPtr) {
-    short payload =  KMArray.cast(coseMacPtr).get((short) 2);
+    short payload = KMArray.cast(coseMacPtr).get((short) 2);
     return decoder.decode(KMCoseKey.exp(), KMByteBlob.cast(payload).getBuffer(), KMByteBlob.cast(payload).getStartOff(),
         KMByteBlob.cast(payload).length());
+  }
+
+  public short getDeviceInfoExp() {
+    short map = KMMap.instance((short) 8);
+    //brand
+    KMMap.cast(map).add((short) 0, KMTextString.exp(), KMTextString.exp());
+    //manufacturer
+    KMMap.cast(map).add((short) 1, KMTextString.exp(), KMTextString.exp());
+    //product
+    KMMap.cast(map).add((short) 2, KMTextString.exp(), KMTextString.exp());
+    //model
+    KMMap.cast(map).add((short) 3, KMTextString.exp(), KMTextString.exp());
+    //vendor patch level
+    KMMap.cast(map).add((short) 4, KMTextString.exp(), KMInteger.exp());
+    //system patch level
+    KMMap.cast(map).add((short) 5, KMTextString.exp(), KMInteger.exp());
+    //boot patch level
+    KMMap.cast(map).add((short) 6, KMTextString.exp(), KMInteger.exp());
+    //os version
+    KMMap.cast(map).add((short) 7, KMTextString.exp(), KMInteger.exp());
+    return map;
+  }
+
+  private short constructCoseKey(short keyType, short keyId, short keyAlg, short keyOps, short curve,
+                                 byte[] pubKey, short pubKeyOff, short pubKeyLen,
+                                 byte[] priv, short privKeyOff, short privKeyLen, boolean testMode) {
+    if (pubKey[pubKeyOff] == 0x04) { // uncompressed format
+      pubKeyOff += 1;
+      pubKeyLen -= 1;
+    }
+    pubKeyLen = (short) (pubKeyLen / 2);
+    short xPtr = KMByteBlob.instance(pubKey, pubKeyOff, pubKeyLen);
+    short yPtr = KMByteBlob.instance(pubKey, (short) (pubKeyOff + pubKeyLen), pubKeyLen);
+    short privPtr = KMByteBlob.instance(priv, privKeyOff, privKeyLen);
+    short coseKey = KMCose.constructCoseKey(keyType, keyId, keyAlg, keyOps, curve, xPtr, yPtr, privPtr, testMode);
+    KMCoseKey.cast(coseKey).canonicalize();
+    return coseKey;
+  }
+
+  public void provisionDeviceUniqueKeyAndCertChain() {
+    short[] lengths = new short[2];
+    byte[] privKey = new byte[128];
+    byte[] pubKey = new byte[128];
+    cryptoProvider.createAsymmetricKey(KMType.EC, privKey, (short) 0, (short) 128,
+        pubKey, (short) 0, (short) 128, lengths);
+    short coseKey =
+        constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMInteger.uint_8(KMCose.COSE_KEY_OP_SIGN),
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            pubKey, (short) 0, lengths[1],
+            privKey, (short) 0, lengths[0],
+            false
+        );
+    short arr = KMArray.instance((short) 1);
+    KMArray.cast(arr).add((short) 0, coseKey);
+    CommandAPDU apdu = encodeApdu((byte) INS_PROVISION_DEVICE_UNIQUE_KEY_CMD, arr);
+    ResponseAPDU response = simulator.transmitCommand(apdu);
+    byte[] resp = response.getBytes();
+    short ptr = decoder.decode(KMInteger.exp(), resp, (short) 0, (short) resp.length);
+    Assert.assertEquals(KMError.OK, KMInteger.cast(ptr).getShort());
+    // Provision Additional certificate chain.
+    provisionAdditionalCertChain(privKey, (short) 0, lengths[0], pubKey, (short) 0, lengths[1]);
+  }
+
+  public short constructCoseSign1(short protectedHeader, short unProtectedHeader, short payload, short aad,
+                                  KMDeviceUniqueKey signingKey) {
+    byte[] scratchpad = new byte[500];
+    short signStructure = KMCose.constructCoseSignStructure(protectedHeader, aad, payload);
+    signStructure = encoder.encode(signStructure, scratchpad, (short) 0);
+    short len = cryptoProvider.ecSign256(signingKey, scratchpad, (short) 0, signStructure, scratchpad, signStructure);
+    signStructure = KMByteBlob.instance(scratchpad, signStructure, len);
+
+    return KMCose.constructCoseSign1(protectedHeader, unProtectedHeader, payload, signStructure);
+  }
+
+  public void provisionAdditionalCertChain(byte[] priv, short privOff, short privLen,
+                                           byte[] pub, short pubOff, short pubLen) {
+    short[] lengths = new short[2];
+    byte[] rootPriv = new byte[128];
+    byte[] rootPub = new byte[128];
+    byte[] scratchpad = new byte[500];
+    cryptoProvider.createAsymmetricKey(KMType.EC, rootPriv, (short) 0, (short) 128,
+        rootPub, (short) 0, (short) 128, lengths);
+    short coseKey =
+        constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMInteger.uint_8(KMCose.COSE_KEY_OP_SIGN),
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            rootPub, (short) 0, lengths[1],
+            rootPriv, (short) 0, lengths[0],
+            false
+        );
+    short payload = encoder.encode(coseKey, scratchpad, (short) 0);
+    payload = KMByteBlob.instance(scratchpad, (short) 0, payload);
+    // Protected Header
+    short protectedHeaderPtr = KMCose.constructHeaders(
+        KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE,
+        KMType.INVALID_VALUE);
+    protectedHeaderPtr = encoder.encode(protectedHeaderPtr, scratchpad, (short) 0);
+    protectedHeaderPtr = KMByteBlob.instance(scratchpad, (short) 0, protectedHeaderPtr);
+
+    // Unprotected Headers.
+    short emptyArr = KMArray.instance((short) 0);
+    short unprotectedHeader = KMCoseHeaders.instance(emptyArr);
+
+    short aad = KMByteBlob.instance((short) 0);
+    KeyPair ecKeyPair = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
+    KMECDeviceUniqueKey ecUniqueKey = new KMECDeviceUniqueKey(ecKeyPair);
+    ecUniqueKey.setS(rootPriv, (short) 0, lengths[0]);
+    ecUniqueKey.setW(rootPub, (short) 0, lengths[1]);
+    short root = constructCoseSign1(protectedHeaderPtr, unprotectedHeader, payload, aad, ecUniqueKey);
+    coseKey =
+        constructCoseKey(
+            KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2),
+            KMType.INVALID_VALUE,
+            KMNInteger.uint_8(KMCose.COSE_ALG_ES256),
+            KMInteger.uint_8(KMCose.COSE_KEY_OP_SIGN),
+            KMInteger.uint_8(KMCose.COSE_ECCURVE_256),
+            pub, (short) 0, pubLen,
+            priv, (short) 0, privLen,
+            false
+        );
+    payload = encoder.encode(coseKey, scratchpad, (short) 0);
+    payload = KMByteBlob.instance(scratchpad, (short) 0, payload);
+    short leaf = constructCoseSign1(protectedHeaderPtr, unprotectedHeader, payload, aad, ecUniqueKey);
+    short additionalCertChain = KMArray.instance((short) 2);
+    KMArray.cast(additionalCertChain).add((short) 0, root);
+    KMArray.cast(additionalCertChain).add((short) 1, leaf);
+    short map  = KMMap.instance((short) 1);
+    byte[] signerName = "TestSigner".getBytes();
+    KMMap.cast(map).add((short) 0, KMTextString.instance(signerName, (short) 0, (short) signerName.length),
+        additionalCertChain);
+    CommandAPDU apdu = encodeApdu((byte) INS_PROVISION_ADDITIONAL_CERT_CHAIN_CMD, map);
+    ResponseAPDU response = simulator.transmitCommand(apdu);
+    byte[] resp = response.getBytes();
+    short ptr = decoder.decode(KMInteger.exp(), resp, (short) 0, (short) resp.length);
+    Assert.assertEquals(KMError.OK, KMInteger.cast(ptr).getShort());
   }
 
   @Test
   public void testGenerateCsr() {
     init();
+    // TODO Production mode fails because GEEK_ROOT public does not match.
+    // To test with production mode comment out validation of GEEK_ROOT in applet.
+    //testGenerateCsr(false);// Production Mode
+    testGenerateCsr(true);// Test Mode.
+    cleanUp();
+  }
+
+  public void testGenerateCsr(boolean testMode) {
     short ret;
     // Generate 4 Ecdsa key pairs and get their maced public keys.
     //Create 4 Keys
@@ -995,7 +1117,7 @@ public class KMFunctionalTest {
     byte[] scratchBuf = new byte[256];
     short encodedLen;
     for (short i = 0; i < 4; i++) {
-      ret = generateRkpEcdsaKeyPair();
+      ret = generateRkpEcdsaKeyPair(testMode);
       // Decode CoseMac0
       short arrCoseMac0 = KMArray.cast(ret).get((short) 2);
       encodedLen = encoder.encode(arrCoseMac0, scratchBuf, (short) 0);
@@ -1019,7 +1141,7 @@ public class KMFunctionalTest {
     // Prepare the maced public key buffer as '4+[Cose_Mac0,..]'
     short eekArr = generateEEk((short) 2);
     short arrPtr = KMArray.instance((short) 4);
-    KMArray.cast(arrPtr).add((short) 0, KMSimpleValue.instance(KMSimpleValue.TRUE));
+    KMArray.cast(arrPtr).add((short) 0, KMSimpleValue.instance(testMode ? KMSimpleValue.TRUE : KMSimpleValue.FALSE));
     KMArray.cast(arrPtr).add((short) 1, arr);
     KMArray.cast(arrPtr).add((short) 2, eekArr);
     KMArray.cast(arrPtr).add((short) 3, KMByteBlob.instance(CSR_CHALLENGE, (short) 0, (short) CSR_CHALLENGE.length));
@@ -1033,7 +1155,7 @@ public class KMFunctionalTest {
     //--------------------------------------------
     short byteBlobExp = KMByteBlob.exp();
     short coseHeadersExp = KMCoseHeaders.exp();
-    short mapExp = KMMap.exp();
+    short mapExp = getDeviceInfoExp();
     // Prepare recipients expression.
     short recipientsArr = KMArray.instance((short) 1);
     short recipient = KMArray.instance((short) 3);
@@ -1059,21 +1181,21 @@ public class KMFunctionalTest {
     //--------------------------------------------
     // Validate the CSR.
     //--------------------------------------------
-    validateGeneratedCsr(ret);
-    cleanUp();
+    validateGeneratedCsr(testMode, ret);
   }
 
-  private void validateGeneratedCsr(short arrPtr) {
+  private void validateGeneratedCsr(boolean testMode, short arrPtr) {
     short deviceInfoMapPtr = KMArray.cast(arrPtr).get((short) 1);
     short protectedDataArrPtr = KMArray.cast(arrPtr).get((short) 2);
     short pubKeysToSignMac = KMArray.cast(arrPtr).get((short) 3);
     //--------------------------------------------
     // Validate Protected Data.
     //--------------------------------------------
-    validateProtectedData(protectedDataArrPtr, deviceInfoMapPtr, pubKeysToSignMac);
+    validateProtectedData(testMode, protectedDataArrPtr, deviceInfoMapPtr, pubKeysToSignMac);
   }
 
-  private void validateProtectedData(short protectedDataArrPtr, short deviceInfoMapPtr, short pubKeysToSignMac) {
+  private void validateProtectedData(boolean testMode, short protectedDataArrPtr, short deviceInfoMapPtr,
+                                     short pubKeysToSignMac) {
     Assert.assertEquals(4, KMArray.cast(protectedDataArrPtr).length());
     //--------------------------------------------
     // Validate recipients structure and get the public key.
@@ -1088,11 +1210,11 @@ public class KMFunctionalTest {
     byte[] eekPriv = new byte[100];
     byte[] eekPub = new byte[100];
     ECPublicKey ecPublicKey = (ECPublicKey) eekKey.getPublic();
-    ECPrivateKey ecPrivateKey = (ECPrivateKey)  eekKey.getPrivate();
+    ECPrivateKey ecPrivateKey = (ECPrivateKey) eekKey.getPrivate();
     short eekPubLen = ecPublicKey.getW(eekPub, (short) 0);
     short eekPrivLen = ecPrivateKey.getS(eekPriv, (short) 0);
     byte[] sessionKey = new byte[100];
-    short sessionKeyLen  =
+    short sessionKeyLen =
         ecdhHkdfDeriveKey(eekPriv, (short) 0, eekPrivLen, eekPub, (short) 0, eekPubLen, ephemeralPub, (short) 0,
             ephemeralPubLen, sessionKey, (short) 0);
     //--------------------------------------------
@@ -1154,8 +1276,10 @@ public class KMFunctionalTest {
     Assert.assertTrue(valid);
     //--------------------------------------------
     //  Validate the decrypted payload.
-    //  payload = [signedMac + bcc]
+    //  payload = [signedMac + bcc + ? AdditionalCertChain]
     //--------------------------------------------
+    short payloadLength = 2;
+    short additionalCertChain = 0;
     short headersExp = KMCoseHeaders.exp();
     short coseKeyExp = KMCoseKey.exp();
     short signedMacArr = KMArray.instance((short) 4);
@@ -1167,11 +1291,24 @@ public class KMFunctionalTest {
     short bccArr = KMArray.instance((short) 2);
     KMArray.cast(bccArr).add((short) 0, coseKeyExp);
     KMArray.cast(bccArr).add((short) 1, signedMacArr);
+    if (!testMode) {
+      short headers = KMCoseHeaders.exp();
+      short arrInst = KMArray.instance((short) 4);
+      KMArray.cast(arrInst).add((short) 0, KMByteBlob.exp());
+      KMArray.cast(arrInst).add((short) 1, headers);
+      KMArray.cast(arrInst).add((short) 2, KMByteBlob.exp());
+      KMArray.cast(arrInst).add((short) 3, KMByteBlob.exp());
+      short coseSignArr = KMArray.exp(arrInst);
+      additionalCertChain = KMMap.instance((short) 1);
+      KMMap.cast(additionalCertChain).add((short) 0, KMTextString.exp(), coseSignArr);
+      payloadLength += 1;
+    }
     // protected payload exp
-    short payload = KMArray.instance((short) 2);
+    short payload = KMArray.instance(payloadLength);
     KMArray.cast(payload).add((short) 0, signedMacArr);
     KMArray.cast(payload).add((short) 1, bccArr);
-    byte[] payloadBuf = new byte[2048];
+    if (additionalCertChain !=0 )
+      KMArray.cast(payload).add((short) 2, additionalCertChain);
     short payloadPtr = decoder.decode(payload, plainText, (short) 0, encryptedDataLen);
     byte[] pub = new byte[100];
     //--------------------------------------------
@@ -1183,6 +1320,14 @@ public class KMFunctionalTest {
     //--------------------------------------------
     validateSignedMac(KMArray.cast(payloadPtr).get((short) 0), pub, (short) 0, pubLen, deviceInfoMapPtr,
         pubKeysToSignMac);
+    //--------------------------------------------
+    //  Validate Additional certificate chain.
+    //--------------------------------------------
+    if (!testMode) {
+      short addCertChain = KMArray.cast(payloadPtr).get((short) 2);
+      addCertChain = KMMap.cast(addCertChain).getKeyValue((short) 0);
+      Assert.assertTrue(validateCertChain(KMCose.COSE_ALG_ES256, KMCose.COSE_ALG_ES256, addCertChain));
+    }
   }
 
   private void validateSignedMac(short signedMacPtr, byte[] pub, short pubOff, short pubLen,
@@ -1242,7 +1387,7 @@ public class KMFunctionalTest {
   }
 
   private short constructPubKeysToSignMac(byte[] ephemeralKey,
-                                                 short ephemeralKeyOff, short ephemeralKeyLen, short pubKeysToSign) {
+                                          short ephemeralKeyOff, short ephemeralKeyLen, short pubKeysToSign) {
     short ptr;
     short len;
     byte[] scratchPad = new byte[2048];
@@ -1271,6 +1416,67 @@ public class KMFunctionalTest {
             len // offset
         );
     return KMByteBlob.instance(scratchPad, len, ptr);
+  }
+
+  private boolean validateCertChain(byte expCertAlg, byte expLeafCertAlg,
+                                         short certChainArr) {
+    byte[] scratchPad = new byte[500];
+    short offset = 0;
+    short len = KMArray.cast(certChainArr).length();
+    short coseHeadersExp = KMCoseHeaders.exp();
+    //prepare exp for coseky
+    short coseKeyExp = KMCoseKey.exp();
+    short ptr1;
+    short ptr2;
+    short signStructure;
+    short encodedLen;
+    short prevCoseKey = 0;
+    short keySize;
+    short alg = expCertAlg;
+    short index;
+    for (index = 0; index < len; index++) {
+      ptr1 = KMArray.cast(certChainArr).get(index);
+
+      // validate protected Headers
+      ptr2 = KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PROTECTED_PARAMS_OFFSET);
+      ptr2 = decoder.decode(coseHeadersExp, KMByteBlob.cast(ptr2).getBuffer(),
+          KMByteBlob.cast(ptr2).getStartOff(), KMByteBlob.cast(ptr2).length());
+      if (!KMCoseHeaders.cast(ptr2).isDataValid(alg, KMType.INVALID_VALUE))
+        return false;
+
+      // parse and get the public key from payload.
+      ptr2 = KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PAYLOAD_OFFSET);
+      ptr2 = decoder.decode(coseKeyExp, KMByteBlob.cast(ptr2).getBuffer(),
+          KMByteBlob.cast(ptr2).getStartOff(), KMByteBlob.cast(ptr2).length());
+      if (index == len - 1) {
+        alg = expLeafCertAlg;
+      }
+      if (!KMCoseKey.cast(ptr2).isDataValid(KMCose.COSE_KEY_TYPE_EC2, KMType.INVALID_VALUE, alg,
+          KMType.INVALID_VALUE, KMCose.COSE_ECCURVE_256))
+        return false;
+      if (prevCoseKey == 0)
+        prevCoseKey = ptr2;
+      // Get the public key.
+      keySize = KMCoseKey.cast(prevCoseKey).getEcdsa256PublicKey(scratchPad, offset);
+      if (keySize != 65) {
+        return false;
+      }
+      // Validate signature.
+      signStructure =
+          KMCose.constructCoseSignStructure(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PROTECTED_PARAMS_OFFSET),
+              KMByteBlob.instance((short) 0),
+              KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_PAYLOAD_OFFSET));
+      encodedLen = encoder.encode(signStructure, scratchPad, (short) (offset + keySize));
+
+      if (!cryptoProvider.ecVerify256(scratchPad, offset, keySize, scratchPad, (short) (offset + keySize), encodedLen,
+          KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).getBuffer(),
+          KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).getStartOff(),
+          KMByteBlob.cast(KMArray.cast(ptr1).get(KMCose.COSE_SIGN1_SIGNATURE_OFFSET)).length())) {
+        return false;
+      }
+      prevCoseKey = ptr2;
+    }
+    return true;
   }
 
   private short getBccPublicKey(short bccPtr, byte[] pub, short pubOff) {
@@ -1418,7 +1624,7 @@ public class KMFunctionalTest {
     init();
     // Running this test case in test mode.
     byte[] testHmacKey = new byte[32];
-    short ret = generateRkpEcdsaKeyPair();
+    short ret = generateRkpEcdsaKeyPair(true);
     // Decode CoseMac0
     short arrPtr = KMArray.cast(ret).get((short) 2);
     short bstrPayloadPtr = KMArray.cast(arrPtr).get((short) 2);
@@ -1446,15 +1652,14 @@ public class KMFunctionalTest {
     if (len != 32)
       Assert.fail("Hmac sign len is not 32");
     // Compare the tag values.
-    Assert.assertEquals(0, Util.arrayCompare(output, (short)0, KMByteBlob.cast(bstrTagPtr).getBuffer(),
+    Assert.assertEquals(0, Util.arrayCompare(output, (short) 0, KMByteBlob.cast(bstrTagPtr).getBuffer(),
         KMByteBlob.cast(bstrTagPtr).getStartOff(), KMByteBlob.cast(bstrTagPtr).length()));
     cleanUp();
   }
 
-  public short generateRkpEcdsaKeyPair() {
-    // test_mode is true.
+  public short generateRkpEcdsaKeyPair(boolean testMode) {
     short arrPtr = KMArray.instance((short) 1);
-    KMArray.cast(arrPtr).add((short) 0, KMSimpleValue.instance(KMSimpleValue.TRUE));
+    KMArray.cast(arrPtr).add((short) 0, KMSimpleValue.instance(testMode ? KMSimpleValue.TRUE : KMSimpleValue.FALSE));
     CommandAPDU apdu = encodeApdu((byte) INS_GENERATE_PROVISIONING_KEY_CMD, arrPtr);
     ResponseAPDU response = simulator.transmitCommand(apdu);
     byte[] resp = response.getBytes();
@@ -1471,171 +1676,164 @@ public class KMFunctionalTest {
     KMArray.cast(arrPtr).add((short) 0, KMInteger.exp());
     KMArray.cast(arrPtr).add((short) 1, KMByteBlob.exp()); // keyblob
     KMArray.cast(arrPtr).add((short) 2, coseMacArrPtr); // bstr of cose mac0
-    short ret = decoder.decode(arrPtr, resp, (short)0, (short) resp.length);
+    short ret = decoder.decode(arrPtr, resp, (short) 0, (short) resp.length);
     Assert.assertEquals(KMError.OK, KMInteger.cast(KMArray.cast(ret).get((short) 0)).getShort());
     return ret;
   }
-  
-//P-256 Curve Parameters
- static final byte[] secp256r1_P = {
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xFF};
 
- static final byte[] secp256r1_A = {
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xFC};
+  //P-256 Curve Parameters
+  static final byte[] secp256r1_P = {
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xFF};
 
- static final byte[] secp256r1_B = {
-     (byte) 0x5A, (byte) 0xC6, (byte) 0x35, (byte) 0xD8, (byte) 0xAA,
-     (byte) 0x3A, (byte) 0x93, (byte) 0xE7, (byte) 0xB3, (byte) 0xEB,
-     (byte) 0xBD, (byte) 0x55, (byte) 0x76, (byte) 0x98, (byte) 0x86,
-     (byte) 0xBC, (byte) 0x65, (byte) 0x1D, (byte) 0x06, (byte) 0xB0,
-     (byte) 0xCC, (byte) 0x53, (byte) 0xB0, (byte) 0xF6, (byte) 0x3B,
-     (byte) 0xCE, (byte) 0x3C, (byte) 0x3E, (byte) 0x27, (byte) 0xD2,
-     (byte) 0x60, (byte) 0x4B};
+  static final byte[] secp256r1_A = {
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x01, (byte) 0x00, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00,
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xFC};
 
- static final byte[] secp256r1_S = {
-     (byte) 0xC4, (byte) 0x9D, (byte) 0x36, (byte) 0x08, (byte) 0x86,
-     (byte) 0xE7, (byte) 0x04, (byte) 0x93, (byte) 0x6A, (byte) 0x66,
-     (byte) 0x78, (byte) 0xE1, (byte) 0x13, (byte) 0x9D, (byte) 0x26,
-     (byte) 0xB7, (byte) 0x81, (byte) 0x9F, (byte) 0x7E, (byte) 0x90};
+  static final byte[] secp256r1_B = {
+      (byte) 0x5A, (byte) 0xC6, (byte) 0x35, (byte) 0xD8, (byte) 0xAA,
+      (byte) 0x3A, (byte) 0x93, (byte) 0xE7, (byte) 0xB3, (byte) 0xEB,
+      (byte) 0xBD, (byte) 0x55, (byte) 0x76, (byte) 0x98, (byte) 0x86,
+      (byte) 0xBC, (byte) 0x65, (byte) 0x1D, (byte) 0x06, (byte) 0xB0,
+      (byte) 0xCC, (byte) 0x53, (byte) 0xB0, (byte) 0xF6, (byte) 0x3B,
+      (byte) 0xCE, (byte) 0x3C, (byte) 0x3E, (byte) 0x27, (byte) 0xD2,
+      (byte) 0x60, (byte) 0x4B};
 
- // Uncompressed form
- static final byte[] secp256r1_UCG = {
-     (byte) 0x04, (byte) 0x6B, (byte) 0x17, (byte) 0xD1, (byte) 0xF2,
-     (byte) 0xE1, (byte) 0x2C, (byte) 0x42, (byte) 0x47, (byte) 0xF8,
-     (byte) 0xBC, (byte) 0xE6, (byte) 0xE5, (byte) 0x63, (byte) 0xA4,
-     (byte) 0x40, (byte) 0xF2, (byte) 0x77, (byte) 0x03, (byte) 0x7D,
-     (byte) 0x81, (byte) 0x2D, (byte) 0xEB, (byte) 0x33, (byte) 0xA0,
-     (byte) 0xF4, (byte) 0xA1, (byte) 0x39, (byte) 0x45, (byte) 0xD8,
-     (byte) 0x98, (byte) 0xC2, (byte) 0x96, (byte) 0x4F, (byte) 0xE3,
-     (byte) 0x42, (byte) 0xE2, (byte) 0xFE, (byte) 0x1A, (byte) 0x7F,
-     (byte) 0x9B, (byte) 0x8E, (byte) 0xE7, (byte) 0xEB, (byte) 0x4A,
-     (byte) 0x7C, (byte) 0x0F, (byte) 0x9E, (byte) 0x16, (byte) 0x2B,
-     (byte) 0xCE, (byte) 0x33, (byte) 0x57, (byte) 0x6B, (byte) 0x31,
-     (byte) 0x5E, (byte) 0xCE, (byte) 0xCB, (byte) 0xB6, (byte) 0x40,
-     (byte) 0x68, (byte) 0x37, (byte) 0xBF, (byte) 0x51, (byte) 0xF5};
+  static final byte[] secp256r1_S = {
+      (byte) 0xC4, (byte) 0x9D, (byte) 0x36, (byte) 0x08, (byte) 0x86,
+      (byte) 0xE7, (byte) 0x04, (byte) 0x93, (byte) 0x6A, (byte) 0x66,
+      (byte) 0x78, (byte) 0xE1, (byte) 0x13, (byte) 0x9D, (byte) 0x26,
+      (byte) 0xB7, (byte) 0x81, (byte) 0x9F, (byte) 0x7E, (byte) 0x90};
 
- static final byte[] secp256r1_N = {
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
-     (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
-     (byte) 0xFF, (byte) 0xBC, (byte) 0xE6, (byte) 0xFA, (byte) 0xAD,
-     (byte) 0xA7, (byte) 0x17, (byte) 0x9E, (byte) 0x84, (byte) 0xF3,
-     (byte) 0xB9, (byte) 0xCA, (byte) 0xC2, (byte) 0xFC, (byte) 0x63,
-     (byte) 0x25, (byte) 0x51};
- static final short secp256r1_H = 1;
+  // Uncompressed form
+  static final byte[] secp256r1_UCG = {
+      (byte) 0x04, (byte) 0x6B, (byte) 0x17, (byte) 0xD1, (byte) 0xF2,
+      (byte) 0xE1, (byte) 0x2C, (byte) 0x42, (byte) 0x47, (byte) 0xF8,
+      (byte) 0xBC, (byte) 0xE6, (byte) 0xE5, (byte) 0x63, (byte) 0xA4,
+      (byte) 0x40, (byte) 0xF2, (byte) 0x77, (byte) 0x03, (byte) 0x7D,
+      (byte) 0x81, (byte) 0x2D, (byte) 0xEB, (byte) 0x33, (byte) 0xA0,
+      (byte) 0xF4, (byte) 0xA1, (byte) 0x39, (byte) 0x45, (byte) 0xD8,
+      (byte) 0x98, (byte) 0xC2, (byte) 0x96, (byte) 0x4F, (byte) 0xE3,
+      (byte) 0x42, (byte) 0xE2, (byte) 0xFE, (byte) 0x1A, (byte) 0x7F,
+      (byte) 0x9B, (byte) 0x8E, (byte) 0xE7, (byte) 0xEB, (byte) 0x4A,
+      (byte) 0x7C, (byte) 0x0F, (byte) 0x9E, (byte) 0x16, (byte) 0x2B,
+      (byte) 0xCE, (byte) 0x33, (byte) 0x57, (byte) 0x6B, (byte) 0x31,
+      (byte) 0x5E, (byte) 0xCE, (byte) 0xCB, (byte) 0xB6, (byte) 0x40,
+      (byte) 0x68, (byte) 0x37, (byte) 0xBF, (byte) 0x51, (byte) 0xF5};
 
- private void initECKey(KeyPair ecKeyPair) {
-   javacard.security.ECPrivateKey privKey = (javacard.security.ECPrivateKey) ecKeyPair.getPrivate();
-   ECPublicKey pubkey = (ECPublicKey) ecKeyPair.getPublic();
-   pubkey.setFieldFP(secp256r1_P, (short) 0, (short) secp256r1_P.length);
-   pubkey.setA(secp256r1_A, (short) 0, (short) secp256r1_A.length);
-   pubkey.setB(secp256r1_B, (short) 0, (short) secp256r1_B.length);
-   pubkey.setG(secp256r1_UCG, (short) 0, (short) secp256r1_UCG.length);
-   pubkey.setK(secp256r1_H);
-   pubkey.setR(secp256r1_N, (short) 0, (short) secp256r1_N.length);
+  static final byte[] secp256r1_N = {
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0x00,
+      (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF,
+      (byte) 0xFF, (byte) 0xBC, (byte) 0xE6, (byte) 0xFA, (byte) 0xAD,
+      (byte) 0xA7, (byte) 0x17, (byte) 0x9E, (byte) 0x84, (byte) 0xF3,
+      (byte) 0xB9, (byte) 0xCA, (byte) 0xC2, (byte) 0xFC, (byte) 0x63,
+      (byte) 0x25, (byte) 0x51};
+  static final short secp256r1_H = 1;
 
-   privKey.setFieldFP(secp256r1_P, (short) 0, (short) secp256r1_P.length);
-   privKey.setA(secp256r1_A, (short) 0, (short) secp256r1_A.length);
-   privKey.setB(secp256r1_B, (short) 0, (short) secp256r1_B.length);
-   privKey.setG(secp256r1_UCG, (short) 0, (short) secp256r1_UCG.length);
-   privKey.setK(secp256r1_H);
-   privKey.setR(secp256r1_N, (short) 0, (short) secp256r1_N.length);
- }
+  private void initECKey(KeyPair ecKeyPair) {
+    javacard.security.ECPrivateKey privKey = (javacard.security.ECPrivateKey) ecKeyPair.getPrivate();
+    ECPublicKey pubkey = (ECPublicKey) ecKeyPair.getPublic();
+    pubkey.setFieldFP(secp256r1_P, (short) 0, (short) secp256r1_P.length);
+    pubkey.setA(secp256r1_A, (short) 0, (short) secp256r1_A.length);
+    pubkey.setB(secp256r1_B, (short) 0, (short) secp256r1_B.length);
+    pubkey.setG(secp256r1_UCG, (short) 0, (short) secp256r1_UCG.length);
+    pubkey.setK(secp256r1_H);
+    pubkey.setR(secp256r1_N, (short) 0, (short) secp256r1_N.length);
 
- String S1 = "1A7C65EAAB71388DBF846045A166A786EC19218C23AC74228E1B8C50E016949E";
- String W1 = "0445FD19B1CE11EB1491D42C3BE64A5B16768F4E2A5777DE18517D744C8DC210D8180D5B4CF37E4CF9C4FCF487713541012E402DFC926F32CF030AF9BB9D7E2268";
+    privKey.setFieldFP(secp256r1_P, (short) 0, (short) secp256r1_P.length);
+    privKey.setA(secp256r1_A, (short) 0, (short) secp256r1_A.length);
+    privKey.setB(secp256r1_B, (short) 0, (short) secp256r1_B.length);
+    privKey.setG(secp256r1_UCG, (short) 0, (short) secp256r1_UCG.length);
+    privKey.setK(secp256r1_H);
+    privKey.setR(secp256r1_N, (short) 0, (short) secp256r1_N.length);
+  }
 
- String S2 = "ED23E4642CB467480C07093662A61BFB2C041151A5652BE254D8DBF0D94DFC49";
- String W2 = "042246D2CDC0A3B4A020A19E9913B724397E241B11DA063334767D7A498FF5D6DDAC9C7AF6EF5BFF47AF1018CDE3D733D1420D99F6B19EF572388D1BA3738EA8A9";
- public static byte[] hexStringToByteArray(String s) {
-   int len = s.length();
-   if (len % 2 != 0)
-     throw new IllegalArgumentException("Expecting each byte of 2 char.");
-   byte[] data = new byte[len / 2];
-   for (int i = 0; i < len; i += 2) {
-     data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
-   }
-   return data;
- }
- @Test
- public void testEcdhxy() {
-   KeyPair ecKeyPair1 = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
-   initECKey(ecKeyPair1);
-   KeyPair ecKeyPair2 = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
-   initECKey(ecKeyPair2);
-   
-   KeyAgreement kg = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN, false);
-   javacard.security.ECPrivateKey privKey = (javacard.security.ECPrivateKey) ecKeyPair1.getPrivate();
-   byte[] S = hexStringToByteArray(S1);
-   privKey.setS(S, (short) 0, (short) S.length);
-   kg.init(privKey);
-   byte[] w2 = hexStringToByteArray(W2);
-   byte[] secret1 = new byte[100];
-   short secretLen = kg.generateSecret(w2, (short)0,  (short)w2.length, secret1, (short) 0);
-   print(secret1, (short) 0, secretLen);
- }
-  
+  String S1 = "1A7C65EAAB71388DBF846045A166A786EC19218C23AC74228E1B8C50E016949E";
+  String W1 = "0445FD19B1CE11EB1491D42C3BE64A5B16768F4E2A5777DE18517D744C8DC210D8180D5B4CF37E4CF9C4FCF487713541012E402DFC926F32CF030AF9BB9D7E2268";
+
+  String S2 = "ED23E4642CB467480C07093662A61BFB2C041151A5652BE254D8DBF0D94DFC49";
+  String W2 = "042246D2CDC0A3B4A020A19E9913B724397E241B11DA063334767D7A498FF5D6DDAC9C7AF6EF5BFF47AF1018CDE3D733D1420D99F6B19EF572388D1BA3738EA8A9";
+
+  public static byte[] hexStringToByteArray(String s) {
+    int len = s.length();
+    if (len % 2 != 0)
+      throw new IllegalArgumentException("Expecting each byte of 2 char.");
+    byte[] data = new byte[len / 2];
+    for (int i = 0; i < len; i += 2) {
+      data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i + 1), 16));
+    }
+    return data;
+  }
+
   @Test
-  public void testEcdh() {
-    byte[] secret1 = new byte[100];
-    byte[] secret2 = new byte[100];
+  public void testEcdhxy() {
     KeyPair ecKeyPair1 = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
-    ecKeyPair1.genKeyPair();
+    initECKey(ecKeyPair1);
     KeyPair ecKeyPair2 = new KeyPair(KeyPair.ALG_EC_FP, KeyBuilder.LENGTH_EC_FP_256);
-    ecKeyPair2.genKeyPair();
-    
-    
-    //Generate ECDH secret1
-//    KeyAgreement kg = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false);
-//    kg.init(ecKeyPair1.getPrivate());
-//    ECPublicKey pubKey2 = (ECPublicKey) ecKeyPair2.getPublic();
-//    byte[] W2 = new byte[100];
-//    short len = pubKey2.getW(W2, (short) 0);
-//    short secretlen1 = kg.generateSecret(W2, (short) 0, len, secret1, (short) 0);
-//    //print(secret1, (short) 0, secretlen1);
-//    
-//    //Generate ECDH secret2
-//    kg = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN_XY, false);
-//    kg.init(ecKeyPair2.getPrivate());
-//    ECPublicKey pubkey1 = (ECPublicKey) ecKeyPair1.getPublic();
-//    byte[] W1 = new byte[100];
-//    len = pubkey1.getW(W1, (short) 0);
-//    short secretlength2 = kg.generateSecret(W1, (short) 0, len, secret2, (short) 0);
-    //print(secret2, (short) 0, secretlength2);
-    Assert.assertArrayEquals(secret1, secret2);
-    
-    System.out.println("Keypair 1 S and W");
-    javacard.security.ECPrivateKey privKey = (javacard.security.ECPrivateKey) ecKeyPair1.getPrivate();
-    byte[] s = new byte[100];
-    short sLen = privKey.getS(s, (short) 0);
-    print(s, (short) 0, sLen);
-    ECPublicKey pubKey = (ECPublicKey) ecKeyPair1.getPublic();
-    byte[] w = new byte[100];
-    short wLen = pubKey.getW(w, (short) 0);
-    print(w, (short) 0, wLen);
-    
-    System.out.println("Keypair 2 S and W");
-    javacard.security.ECPrivateKey privKey2 = (javacard.security.ECPrivateKey) ecKeyPair2.getPrivate();
-    byte[] s2 = new byte[100];
-    short s2Len = privKey2.getS(s2, (short) 0);
-    print(s2, (short) 0, s2Len);
-    ECPublicKey pubKey_2 = (ECPublicKey) ecKeyPair2.getPublic();
-    byte[] w2 = new byte[100];
-    short w2Len = pubKey_2.getW(w2, (short) 0);
-    print(w2, (short) 0, w2Len);
+    initECKey(ecKeyPair2);
 
+    KeyAgreement kg = KeyAgreement.getInstance(KeyAgreement.ALG_EC_SVDP_DH_PLAIN, false);
+    javacard.security.ECPrivateKey privKey = (javacard.security.ECPrivateKey) ecKeyPair1.getPrivate();
+    byte[] S = hexStringToByteArray(S1);
+    privKey.setS(S, (short) 0, (short) S.length);
+    kg.init(privKey);
+    byte[] w2 = hexStringToByteArray(W2);
+    byte[] secret1 = new byte[100];
+    short secretLen = kg.generateSecret(w2, (short) 0, (short) w2.length, secret1, (short) 0);
+    print(secret1, (short) 0, secretLen);
+  }
+
+  @Test
+  public void testCanonicalize() {
+    init();
+    // KeyType
+    short keyType = KMCosePairIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_TYPE), KMInteger.uint_8(KMCose.COSE_KEY_TYPE_EC2));
+    //Alg
+    short alg = KMCosePairNegIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_ALGORITHM), KMNInteger.uint_8(KMCose.COSE_ALG_ES256));
+    //curve
+    short curve = KMCosePairIntegerTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_CURVE), KMInteger.uint_8(KMCose.COSE_ECCURVE_256));
+    //key_ops
+    short keyops = KMCosePairIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_OPS), KMInteger.uint_8(KMCose.COSE_KEY_OP_VERIFY));
+    byte[] pubx = new byte[32];
+    Util.arrayFillNonAtomic(pubx, (short) 0, (short) pubx.length, (byte) 0);
+    // pubx
+    short pub_x = KMCosePairByteBlobTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PUBKEY_X),
+        KMByteBlob.instance(pubx, (short) 0, (short) pubx.length));
+    short pub_y = KMCosePairByteBlobTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PUBKEY_Y),
+        KMByteBlob.instance(pubx, (short) 0, (short) pubx.length));
+    short priv = KMCosePairByteBlobTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PRIV_KEY),
+        KMByteBlob.instance(pubx, (short) 0, (short) pubx.length));
+    short testMode = KMCosePairSimpleValueTag.instance(KMNInteger.instance(KMCose.COSE_TEST_KEY, (short) 0,
+        (short) KMCose.COSE_TEST_KEY.length), KMSimpleValue.instance(KMSimpleValue.NULL));
+    short arrPtr = KMArray.instance((short) 8);
+    KMArray.cast(arrPtr).add((short) 0, keyType);
+    KMArray.cast(arrPtr).add((short) 1, alg);
+    KMArray.cast(arrPtr).add((short) 2, curve);
+    KMArray.cast(arrPtr).add((short) 3, keyops);
+    KMArray.cast(arrPtr).add((short) 4, pub_x);
+    KMArray.cast(arrPtr).add((short) 5, pub_y);
+    KMArray.cast(arrPtr).add((short) 6, priv);
+    KMArray.cast(arrPtr).add((short) 7, testMode);
+    short coseKey = KMCoseKey.instance(arrPtr);
+    byte[] blob = new byte[256];
+    short len = encoder.encode(coseKey, blob, (short) 0);
+    System.out.println(" Before canonicolize Encode Cosekey: =>");
+    print(blob, (short) 0, len);
+    KMCoseKey.cast(coseKey).canonicalize();
+    System.out.println(" After canonicolize Encode Cosekey: =>");
+    len = encoder.encode(coseKey, blob, (short) 0);
+    print(blob, (short) 0, len);
   }
 
   @Test
@@ -1650,21 +1848,21 @@ public class KMFunctionalTest {
     //key_ops
     short keyops = KMCosePairIntegerTag.instance(KMInteger.uint_8(KMCose.COSE_KEY_KEY_OPS), KMInteger.uint_8(KMCose.COSE_KEY_OP_VERIFY));
     byte[] pubx = new byte[32];
-    Util.arrayFillNonAtomic(pubx, (short)0, (short)pubx.length,(byte)0);
+    Util.arrayFillNonAtomic(pubx, (short) 0, (short) pubx.length, (byte) 0);
     // pubx
     short pub_x = KMCosePairByteBlobTag.instance(KMNInteger.uint_8(KMCose.COSE_KEY_PUBKEY_X),
         KMByteBlob.instance(pubx, (short) 0, (short) pubx.length));
     short arrPtr = KMArray.instance((short) 5);
-    KMArray.cast(arrPtr).add((short)0, keyType);
-    KMArray.cast(arrPtr).add((short)1, alg);
-    KMArray.cast(arrPtr).add((short)2, curve);
-    KMArray.cast(arrPtr).add((short)3, keyops);
-    KMArray.cast(arrPtr).add((short)4, pub_x);
+    KMArray.cast(arrPtr).add((short) 0, keyType);
+    KMArray.cast(arrPtr).add((short) 1, alg);
+    KMArray.cast(arrPtr).add((short) 2, curve);
+    KMArray.cast(arrPtr).add((short) 3, keyops);
+    KMArray.cast(arrPtr).add((short) 4, pub_x);
     short coseKey = KMCoseKey.instance(arrPtr);
     byte[] blob = new byte[256];
-    short len = encoder.encode(coseKey, blob, (short)0);
+    short len = encoder.encode(coseKey, blob, (short) 0);
     System.out.println(" Encode Cosekey: =>");
-    print(blob, (short)0, len);
+    print(blob, (short) 0, len);
 
 //
 //    CommandAPDU apdu = encodeApdu((byte) INS_TEST, coseKey);
@@ -2486,7 +2684,7 @@ public class KMFunctionalTest {
   }
 
   public short generateAesDesKey(byte alg, short keysize, byte[] clientId, byte[] appData,
-      boolean unlockReqd) {
+                                 boolean unlockReqd) {
     short tagCount = 7;
     if (clientId != null) {
       tagCount++;
@@ -3151,7 +3349,7 @@ public class KMFunctionalTest {
   }
 
   public short getPublicKey(byte[] keyBlob, short off, short len,
-      byte[] pubKey, short pubKeyOff) {
+                            byte[] pubKey, short pubKeyOff) {
     short keyBlobPtr = extractKeyBlobArray(keyBlob, off, len);
     short arrayLen = KMArray.cast(keyBlobPtr).length();
     if (arrayLen < 5) {
@@ -3174,8 +3372,8 @@ public class KMFunctionalTest {
   }
 
   public short rsaEncryptMessage(byte[] keyBlob, short padding, short digest, byte[] input,
-      short inputOff, short inputlen,
-      byte[] output, short outputOff) {
+                                 short inputOff, short inputlen,
+                                 byte[] output, short outputOff) {
     byte alg = Cipher.ALG_RSA_PKCS1;
     byte[] tmp = null;
     short inLen = inputlen;
@@ -3217,8 +3415,8 @@ public class KMFunctionalTest {
   }
 
   public short rsaOaepEncryptMessage(byte[] keyBlob, short digest, byte[] input, short inputOff,
-      short inputlen,
-      byte[] output, short outputOff) {
+                                     short inputlen,
+                                     byte[] output, short outputOff) {
     byte[] mod = new byte[256];
     if (0 == getPublicKey(keyBlob, (short) 0, (short) keyBlob.length, mod, (short) 0)) {
       return 0;
@@ -3275,8 +3473,8 @@ public class KMFunctionalTest {
   }
 
   public boolean ecNoDigestVerifyMessage(byte[] input, short inputOff,
-      short inputlen, byte[] sign, short signOff, short signLen,
-      byte[] keyBlob) {
+                                         short inputlen, byte[] sign, short signOff, short signLen,
+                                         byte[] keyBlob) {
     KeyFactory kf;
     byte[] pubKey = new byte[128];
     short keyStart = 0;
@@ -3337,7 +3535,7 @@ public class KMFunctionalTest {
   }
 
   public boolean ecVerifyMessage(byte[] input, short inputOff, short inputlen,
-      byte[] sign, short signOff, short signLen, byte[] keyBlob) {
+                                 byte[] sign, short signOff, short signLen, byte[] keyBlob) {
     Signature ecVerifier;
     byte[] pubKey = new byte[128];
     short len = getPublicKey(keyBlob, (short) 0, (short) keyBlob.length,
@@ -3354,8 +3552,8 @@ public class KMFunctionalTest {
   }
 
   public boolean rsaVerifyMessage(byte[] input, short inputOff, short inputlen, byte[] sign,
-      short signOff, short signLen,
-      short digest, short padding, byte[] keyBlob) {
+                                  short signOff, short signLen,
+                                  short digest, short padding, byte[] keyBlob) {
     if (digest == KMType.DIGEST_NONE || padding == KMType.PADDING_NONE) {
       return false;
     }
@@ -3441,12 +3639,12 @@ public class KMFunctionalTest {
     byte[] keyBlob = new byte[KMByteBlob.cast(desKeyPtr).length()];
     Util.arrayCopyNonAtomic(KMByteBlob.cast(desKeyPtr).getBuffer(), KMByteBlob
             .cast(desKeyPtr).getStartOff(), keyBlob, (short) 0,
-            (short) keyBlob.length);
+        (short) keyBlob.length);
     short desPkcs7Params = getAesDesParams(KMType.DES, (byte) KMType.CTR,
-            KMType.PKCS7, new byte[12]);
+        KMType.PKCS7, new byte[12]);
     short ret = begin(KMType.ENCRYPT,
-            KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length),
-            KMKeyParameters.instance(desPkcs7Params), (short) 0, false);
+        KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length),
+        KMKeyParameters.instance(desPkcs7Params), (short) 0, false);
     Assert.assertTrue(ret == KMError.UNSUPPORTED_BLOCK_MODE);
     cleanUp();
   }
@@ -3706,27 +3904,27 @@ public class KMFunctionalTest {
     short NO_UPGRADE = 0x01;
     short UPGRADE = 0x02;
     short[][] test_data = {
-            {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, NO_UPGRADE, KMError.OK },
-            {OS_VERSION+1, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION, OS_PATCH_LEVEL+1, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL+1, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL+1, UPGRADE,  KMError.OK },
-            {OS_VERSION+1, OS_PATCH_LEVEL+1, VENDOR_PATCH_LEVEL+1, BOOT_PATCH_LEVEL+1, UPGRADE,  KMError.OK },
-            {OS_VERSION+1, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL+1, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION+1, OS_PATCH_LEVEL+1, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL-1, NO_UPGRADE,  KMError.INVALID_ARGUMENT },
-            {OS_VERSION-1/*0*/, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE,  KMError.OK },
-            {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL-1, BOOT_PATCH_LEVEL, NO_UPGRADE,  KMError.INVALID_ARGUMENT },
-            {OS_VERSION, OS_PATCH_LEVEL+1, VENDOR_PATCH_LEVEL-1, BOOT_PATCH_LEVEL, NO_UPGRADE,  KMError.INVALID_ARGUMENT },
-            {0, OS_PATCH_LEVEL+1, VENDOR_PATCH_LEVEL-1, BOOT_PATCH_LEVEL+1, NO_UPGRADE,  KMError.INVALID_ARGUMENT },
+        {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, NO_UPGRADE, KMError.OK},
+        {OS_VERSION + 1, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION, OS_PATCH_LEVEL + 1, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL + 1, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL + 1, UPGRADE, KMError.OK},
+        {OS_VERSION + 1, OS_PATCH_LEVEL + 1, VENDOR_PATCH_LEVEL + 1, BOOT_PATCH_LEVEL + 1, UPGRADE, KMError.OK},
+        {OS_VERSION + 1, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL + 1, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION + 1, OS_PATCH_LEVEL + 1, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL - 1, NO_UPGRADE, KMError.INVALID_ARGUMENT},
+        {OS_VERSION - 1/*0*/, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL, BOOT_PATCH_LEVEL, UPGRADE, KMError.OK},
+        {OS_VERSION, OS_PATCH_LEVEL, VENDOR_PATCH_LEVEL - 1, BOOT_PATCH_LEVEL, NO_UPGRADE, KMError.INVALID_ARGUMENT},
+        {OS_VERSION, OS_PATCH_LEVEL + 1, VENDOR_PATCH_LEVEL - 1, BOOT_PATCH_LEVEL, NO_UPGRADE, KMError.INVALID_ARGUMENT},
+        {0, OS_PATCH_LEVEL + 1, VENDOR_PATCH_LEVEL - 1, BOOT_PATCH_LEVEL + 1, NO_UPGRADE, KMError.INVALID_ARGUMENT},
     };
     for (int i = 0; i < test_data.length; i++) {
       setBootParams(simulator, (short) test_data[i][3]);
       setAndroidOSSystemProperties(simulator, (short) test_data[i][0], (short) test_data[i][1],
           (short) test_data[i][2]);
       ret = upgradeKey(
-        KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length),
-        null, null, test_data[i][5]);
+          KMByteBlob.instance(keyBlob, (short) 0, (short) keyBlob.length),
+          null, null, test_data[i][5]);
       if (test_data[i][5] != KMError.OK)
         continue;
       keyBlobPtr = KMArray.cast(ret).get((short) 1);
@@ -3738,34 +3936,34 @@ public class KMFunctionalTest {
         ret = getKeyCharacteristics(keyBlobPtr);
         keyCharacteristics = KMArray.cast(ret).get((short) 1);
         hwParams = KMKeyCharacteristics.cast(keyCharacteristics)
-          .getHardwareEnforced();
+            .getHardwareEnforced();
         osVersion = KMKeyParameters.findTag(KMType.UINT_TAG, KMType.OS_VERSION,
-          hwParams);
+            hwParams);
         osVersion = KMIntegerTag.cast(osVersion).getValue();
         osPatch = KMKeyParameters.findTag(KMType.UINT_TAG,
-          KMType.OS_PATCH_LEVEL, hwParams);
+            KMType.OS_PATCH_LEVEL, hwParams);
         osPatch = KMIntegerTag.cast(osPatch).getValue();
         short ptr = KMKeyParameters.findTag(KMType.UINT_TAG,
-          KMType.VENDOR_PATCH_LEVEL, hwParams);
+            KMType.VENDOR_PATCH_LEVEL, hwParams);
         short vendorPatchLevel = KMIntegerTag.cast(ptr).getValue();
         ptr = KMKeyParameters.findTag(KMType.UINT_TAG, KMType.BOOT_PATCH_LEVEL,
-          hwParams);
+            hwParams);
         short bootPatchLevel = KMIntegerTag.cast(ptr).getValue();
         Assert.assertEquals(KMInteger.cast(osVersion).getShort(),
-          test_data[i][0]);
+            test_data[i][0]);
         Assert.assertEquals(KMInteger.cast(osPatch).getShort(),
-          test_data[i][1]);
+            test_data[i][1]);
         Assert.assertEquals(KMInteger.cast(vendorPatchLevel).getShort(),
-          test_data[i][2]);
+            test_data[i][2]);
         Assert.assertEquals(KMInteger.cast(bootPatchLevel).getShort(),
-          test_data[i][3]);
+            test_data[i][3]);
       }
     }
     cleanUp();
   }
 
   public void testCardRest() {
-    byte[] input = new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+    byte[] input = new byte[]{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
     // Test different combinations of reset events happening in the ordered flow of
     // begin - begin1 - update - update1 - finish - finish1 - abort
     boolean[][] resetEvents = {
@@ -3782,7 +3980,7 @@ public class KMFunctionalTest {
         {NO_RESET, RESET, RESET, NO_RESET, NO_RESET, NO_RESET, NO_RESET},
         {RESET, RESET, RESET, RESET, RESET, RESET, RESET},
     };
-    for(int i = 0; i < resetEvents.length; i++) {
+    for (int i = 0; i < resetEvents.length; i++) {
       // Generate Key----------------
       short ret = generateHmacKey(null, null);
       // Store the generated key in a new byte blob.
@@ -4277,7 +4475,6 @@ public class KMFunctionalTest {
     }
 
     //Test
-
     if (updateFlag) {
       dataPtr = KMByteBlob.instance(data, (short) 0, (short) /*16*/firstDataLen);
       if (aesGcmFlag) {
@@ -4406,7 +4603,7 @@ public class KMFunctionalTest {
   }
 
   public short finish(short operationHandle, short data, byte[] signature, short inParams,
-      short hwToken, short verToken, short expectedErr, boolean triggerReset) {
+                      short hwToken, short verToken, short expectedErr, boolean triggerReset) {
     if (hwToken == 0) {
       hwToken = KMHardwareAuthToken.instance();
     }
@@ -4469,7 +4666,7 @@ public class KMFunctionalTest {
   }
 
   public short update(short operationHandle, short data, short inParams, short hwToken,
-      short verToken, boolean triggerReset) {
+                      short verToken, boolean triggerReset) {
     if (hwToken == 0) {
       hwToken = KMHardwareAuthToken.instance();
     }
@@ -4510,7 +4707,7 @@ public class KMFunctionalTest {
         Assert.assertEquals(error, SE_POWER_RESET_FLAG);
       }
     } else {
-      ret = decoder.decode(KMInteger.exp(), respBuf, (short)0, len);
+      ret = decoder.decode(KMInteger.exp(), respBuf, (short) 0, len);
       if (triggerReset) {
         short powerResetStatus = KMInteger.cast(ret).getSignificantShort();
         Assert.assertEquals(powerResetStatus, SE_POWER_RESET_FLAG);
