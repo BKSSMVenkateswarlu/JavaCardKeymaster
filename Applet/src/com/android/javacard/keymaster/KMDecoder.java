@@ -50,7 +50,7 @@ public class KMDecoder {
 
   public KMDecoder() {
     bufferRef = JCSystem.makeTransientObjectArray((short) 1, JCSystem.CLEAR_ON_RESET);
-    scratchBuf = (short[]) JCSystem.makeTransientShortArray(SCRATCH_BUF_SIZE, JCSystem.CLEAR_ON_RESET);
+    scratchBuf = JCSystem.makeTransientShortArray(SCRATCH_BUF_SIZE, JCSystem.CLEAR_ON_RESET);
     bufferRef[0] = null;
     scratchBuf[START_OFFSET] = (short) 0;
     scratchBuf[LEN_OFFSET] = (short) 0;
@@ -117,6 +117,7 @@ public class KMDecoder {
         return decodeHwAuthToken(exp);
       case KMType.COSE_KEY_TYPE:
       case KMType.COSE_HEADERS_TYPE:
+      case KMType.COSE_CERT_PAYLOAD_TYPE:
         return decodeCoseMap(exp);
       case KMType.COSE_PAIR_TAG_TYPE:
         short tagValueType = KMCosePairTagType.getTagValueType(exp);
@@ -258,7 +259,9 @@ public class KMDecoder {
       tagValueType = KMType.COSE_PAIR_COSE_KEY_TAG_TYPE;
     } else if (majorType == SIMPLE_VALUE_TYPE) {
       tagValueType = KMType.COSE_PAIR_SIMPLE_VALUE_TAG_TYPE;
-    } else {
+    } else if (majorType == TSTR_TYPE) {
+      tagValueType = KMType.COSE_PAIR_TEXT_STR_TAG_TYPE;
+    }else {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
     return tagValueType;
@@ -447,14 +450,14 @@ public class KMDecoder {
       ISOException.throwIt(ISO7816.SW_DATA_INVALID);
     }
     short len = (short) (buffer[startOff] & ADDITIONAL_MASK);
-    byte enumVal = 0;
+    byte enumVal;
     if (len > UINT8_LENGTH) {
       ISOException.throwIt(ISO7816.SW_WRONG_LENGTH);
     }
     if (len < UINT8_LENGTH) {
       enumVal = (byte) (len & ADDITIONAL_MASK);
       incrementStartOff((short) 1);
-    } else if (len == UINT8_LENGTH) {
+    } else {
       incrementStartOff((short) 1);
       // startOff  is incremented so update the startOff
       // with latest value before using it.

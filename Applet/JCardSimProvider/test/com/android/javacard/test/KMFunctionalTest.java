@@ -100,9 +100,9 @@ public class KMFunctionalTest {
   private static final byte INS_DEVICE_LOCKED_CMD = INS_END_KM_PROVISION_CMD + 20;//0x34
   private static final byte INS_EARLY_BOOT_ENDED_CMD = INS_END_KM_PROVISION_CMD + 21; //0x35
   private static final byte INS_GET_CERT_CHAIN_CMD = INS_END_KM_PROVISION_CMD + 22; //0x36
-  private static final byte INS_GET_RKP_HARDWARE_INFO = INS_END_KM_PROVISION_CMD + 23; //0x37
-  private static final byte INS_GENERATE_PROVISIONING_KEY_CMD = INS_END_KM_PROVISION_CMD + 24; //0x38
-  private static final byte INS_GENERATE_CSR_KEY_CMD = INS_END_KM_PROVISION_CMD + 25; //0x39
+  private static final byte INS_GET_RKP_HARDWARE_INFO = INS_END_KM_PROVISION_CMD + 24; //0x37
+  private static final byte INS_GENERATE_PROVISIONING_KEY_CMD = INS_END_KM_PROVISION_CMD + 25; //0x38
+  private static final byte INS_GENERATE_CSR_KEY_CMD = INS_END_KM_PROVISION_CMD + 26; //0x39
 
   private static final byte[] kEcPrivKey = {
       (byte) 0x21, (byte) 0xe0, (byte) 0x86, (byte) 0x43, (byte) 0x2a,
@@ -1119,10 +1119,11 @@ public class KMFunctionalTest {
     for (short i = 0; i < 4; i++) {
       ret = generateRkpEcdsaKeyPair(testMode);
       // Decode CoseMac0
-      short arrCoseMac0 = KMArray.cast(ret).get((short) 2);
-      encodedLen = encoder.encode(arrCoseMac0, scratchBuf, (short) 0);
-      mackedKeys[i] = new byte[encodedLen];
-      Util.arrayCopy(scratchBuf, (short) 0, mackedKeys[i], (short) 0, encodedLen);
+      short byteBlobCoseMac0 = KMArray.cast(ret).get((short) 1);
+      mackedKeys[i] = new byte[KMByteBlob.cast(byteBlobCoseMac0).length()];
+      Util.arrayCopy(KMByteBlob.cast(byteBlobCoseMac0).getBuffer(),
+        KMByteBlob.cast(byteBlobCoseMac0).getStartOff(), mackedKeys[i], (short) 0,
+        KMByteBlob.cast(byteBlobCoseMac0).length());
     }
     short arr = KMArray.instance((short) 4);
     short coseKeyArr = KMArray.instance((short) 4);
@@ -1139,7 +1140,7 @@ public class KMFunctionalTest {
     encodedCoseKeysArray = new byte[coseKeyArrBufLen];
     Util.arrayCopy(coseKeyArrBuf, (short) 0, encodedCoseKeysArray, (short) 0, coseKeyArrBufLen);
     // Prepare the maced public key buffer as '4+[Cose_Mac0,..]'
-    short eekArr = generateEEk((short) 2);
+    short eekArr = generateEEk((short) 4);
     short arrPtr = KMArray.instance((short) 4);
     KMArray.cast(arrPtr).add((short) 0, KMSimpleValue.instance(testMode ? KMSimpleValue.TRUE : KMSimpleValue.FALSE));
     KMArray.cast(arrPtr).add((short) 1, arr);
@@ -1350,9 +1351,10 @@ public class KMFunctionalTest {
     // Get the signature
     short signature = KMArray.cast(signedMacPtr).get((short) 3);
     // Prepare Aad [Challenge + deviceInfoMap]
-    short aad = KMArray.instance((short) 2);
+    short aad = KMArray.instance((short) 3);
     KMArray.cast(aad).add((short) 0, KMByteBlob.instance(CSR_CHALLENGE, (short) 0, (short) CSR_CHALLENGE.length));
     KMArray.cast(aad).add((short) 1, deviceInfoMapPtr);
+    KMArray.cast(aad).add((short) 2, pubKeysToSignMac);
     byte[] aadBuf = new byte[256];
     short aadLen = encoder.encode(aad, aadBuf, (short) 0);
     aad = KMByteBlob.instance(aadBuf, (short) 0, aadLen);
@@ -1516,16 +1518,11 @@ public class KMFunctionalTest {
           KMByteBlob.cast(signature).length()));
 
       // Get the public key from the payload.
-      short certPayload = KMArray.instance((short) 4);
-      KMArray.cast(certPayload).add((short) 0, KMCosePairTextStringTag.exp());
-      KMArray.cast(certPayload).add((short) 1, KMCosePairTextStringTag.exp());
-      KMArray.cast(certPayload).add((short) 2, KMCosePairByteBlobTag.exp());
-      KMArray.cast(certPayload).add((short) 3, KMCosePairByteBlobTag.exp());
+      short certPayload = KMCoseCertPayload.exp();
       short payloadPtr =
           decoder.decode(certPayload, KMByteBlob.cast(payload).getBuffer(), KMByteBlob.cast(payload).getStartOff(),
               KMByteBlob.cast(payload).length());
-      short coseKeyPtr = KMArray.cast(payloadPtr).get((short) 2);
-      coseKeyPtr = KMCosePairByteBlobTag.cast(coseKeyPtr).getValuePtr();
+      short coseKeyPtr = KMCoseCertPayload.cast(payloadPtr).getSubjectPublicKey();
       coseKeyPtr = decoder.decode(KMCoseKey.exp(), KMByteBlob.cast(coseKeyPtr).getBuffer(),
           KMByteBlob.cast(coseKeyPtr).getStartOff(), KMByteBlob.cast(coseKeyPtr).length());
       prevCoseKey = coseKeyPtr;
@@ -1625,8 +1622,18 @@ public class KMFunctionalTest {
     // Running this test case in test mode.
     byte[] testHmacKey = new byte[32];
     short ret = generateRkpEcdsaKeyPair(true);
+    // Prepare exp() for coseMac.
+    short coseMacArrPtr = KMArray.instance((short) 4);
+    short coseHeadersExp = KMCoseHeaders.exp();
+    KMArray.cast(coseMacArrPtr).add((short) 0, KMByteBlob.exp());
+    KMArray.cast(coseMacArrPtr).add((short) 1, coseHeadersExp);
+    KMArray.cast(coseMacArrPtr).add((short) 2, KMByteBlob.exp());
+    KMArray.cast(coseMacArrPtr).add((short) 3, KMByteBlob.exp());
+    short byteBlobMac = KMArray.cast(ret).get((short) 1);
+    short arrPtr =
+    decoder.decode(coseMacArrPtr, KMByteBlob.cast(byteBlobMac).getBuffer(), KMByteBlob.cast(byteBlobMac).getStartOff(),
+      KMByteBlob.cast(byteBlobMac).length());
     // Decode CoseMac0
-    short arrPtr = KMArray.cast(ret).get((short) 2);
     short bstrPayloadPtr = KMArray.cast(arrPtr).get((short) 2);
     short bstrTagPtr = KMArray.cast(arrPtr).get((short) 3);
     short bstrProtectedHptr = KMArray.cast(arrPtr).get((short) 0);
@@ -1664,18 +1671,11 @@ public class KMFunctionalTest {
     ResponseAPDU response = simulator.transmitCommand(apdu);
     byte[] resp = response.getBytes();
     print(resp, (short) 0, (short) resp.length);
-    // Prepare exp() for coseMac.
-    short coseMacArrPtr = KMArray.instance((short) 4);
-    short coseHeadersExp = KMCoseHeaders.exp();
-    KMArray.cast(coseMacArrPtr).add((short) 0, KMByteBlob.exp());
-    KMArray.cast(coseMacArrPtr).add((short) 1, coseHeadersExp);
-    KMArray.cast(coseMacArrPtr).add((short) 2, KMByteBlob.exp());
-    KMArray.cast(coseMacArrPtr).add((short) 3, KMByteBlob.exp());
     // Prepare exp for output.
     arrPtr = KMArray.instance((short) 3);
     KMArray.cast(arrPtr).add((short) 0, KMInteger.exp());
-    KMArray.cast(arrPtr).add((short) 1, KMByteBlob.exp()); // keyblob
-    KMArray.cast(arrPtr).add((short) 2, coseMacArrPtr); // bstr of cose mac0
+    KMArray.cast(arrPtr).add((short) 1, KMByteBlob.exp()); // bstr of cose mac0
+    KMArray.cast(arrPtr).add((short) 2, KMByteBlob.exp()); // keyblob
     short ret = decoder.decode(arrPtr, resp, (short) 0, (short) resp.length);
     Assert.assertEquals(KMError.OK, KMInteger.cast(KMArray.cast(ret).get((short) 0)).getShort());
     return ret;

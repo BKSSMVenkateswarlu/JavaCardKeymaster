@@ -115,9 +115,9 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   private static final byte INS_DEVICE_LOCKED_CMD = INS_END_KM_PROVISION_CMD + 20;//0x34
   private static final byte INS_EARLY_BOOT_ENDED_CMD = INS_END_KM_PROVISION_CMD + 21; //0x35
   private static final byte INS_GET_CERT_CHAIN_CMD = INS_END_KM_PROVISION_CMD + 22; //0x36
-  private static final byte INS_GET_RKP_HARDWARE_INFO = INS_END_KM_PROVISION_CMD + 23; //0x37
-  private static final byte INS_GENERATE_PROVISIONING_KEY_CMD = INS_END_KM_PROVISION_CMD + 24; //0x38
-  private static final byte INS_GENERATE_CSR_KEY_CMD = INS_END_KM_PROVISION_CMD + 25; //0x39
+  private static final byte INS_GET_RKP_HARDWARE_INFO = INS_END_KM_PROVISION_CMD + 24; //0x38
+  private static final byte INS_GENERATE_PROVISIONING_KEY_CMD = INS_END_KM_PROVISION_CMD + 25; //0x39
+  private static final byte INS_GENERATE_CSR_KEY_CMD = INS_END_KM_PROVISION_CMD + 26; //0x40
 
   private static final byte INS_END_KM_CMD = 0x7F;
 
@@ -242,11 +242,11 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   }
 
   private void initializeTransientArrays() {
-    data = JCSystem.makeTransientShortArray((short) DATA_ARRAY_SIZE, JCSystem.CLEAR_ON_RESET);
+    data = JCSystem.makeTransientShortArray(DATA_ARRAY_SIZE, JCSystem.CLEAR_ON_RESET);
     bufferRef = JCSystem.makeTransientObjectArray((short) 1, JCSystem.CLEAR_ON_RESET);
     bufferProp = JCSystem.makeTransientShortArray((short) 4, JCSystem.CLEAR_ON_RESET);
     tmpVariables =
-        JCSystem.makeTransientShortArray((short) TMP_VARIABLE_ARRAY_SIZE, JCSystem.CLEAR_ON_RESET);
+        JCSystem.makeTransientShortArray(TMP_VARIABLE_ARRAY_SIZE, JCSystem.CLEAR_ON_RESET);
     bufferProp[BUF_START_OFFSET] = 0;
     bufferProp[BUF_LEN_OFFSET] = 0;
   }
@@ -1279,7 +1279,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     parseEncryptedKeyBlob(scratchPad);
     boolean isKeyUpgradeRequired = false;
     // Check if key requires upgrade.
-    isKeyUpgradeRequired |= isKeyUpgradeRequired(KMType.OS_VERSION, repository.getOsVersion());
+    isKeyUpgradeRequired = isKeyUpgradeRequired(KMType.OS_VERSION, repository.getOsVersion());
     isKeyUpgradeRequired |= isKeyUpgradeRequired(KMType.OS_PATCH_LEVEL, repository.getOsPatch());
     isKeyUpgradeRequired |= isKeyUpgradeRequired(KMType.VENDOR_PATCH_LEVEL, repository.getVendorPatchLevel());
     isKeyUpgradeRequired |= isKeyUpgradeRequired(KMType.BOOT_PATCH_LEVEL, repository.getBootPatchLevel());
@@ -2733,7 +2733,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
         try {
           op.setOperation(
               seProvider.initSymmetricOperation(
-                  (byte) KMType.SIGN,
+                  KMType.SIGN,
                   op.getAlgorithm(),
                   op.getDigest(),
                   op.getPadding(),
@@ -3695,7 +3695,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     KMMap.cast(map).add(index++,
         KMTextString.instance(BOOT_PATCH_LEVEL, (short) 0, (short) BOOT_PATCH_LEVEL.length),
         bootPatchLevel);
-    KMMap.cast(map).add(index++,
+    KMMap.cast(map).add(index,
         KMTextString.instance(OS_VERSION, (short) 0, (short) OS_VERSION.length),
         osVersion);
     // TODO Add two below
@@ -3709,11 +3709,13 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   }
 
   private static short createSignedMac(KMDeviceUniqueKey deviceUniqueKey, byte[] scratchPad, short offset,
-                                       short ephmeralMacKey, short challengePtr, short deviceMapPtr) {
+                                       short ephmeralMacKey, short challengePtr, short deviceMapPtr,
+                                       short pubKeysToSign) {
     /* Prepare AAD */
-    short aad = KMArray.instance((short) 2);
+    short aad = KMArray.instance((short) 3);
     KMArray.cast(aad).add((short) 0, challengePtr);
     KMArray.cast(aad).add((short) 1, deviceMapPtr);
+    KMArray.cast(aad).add((short) 2, pubKeysToSign);
     aad = encoder.encode(aad, scratchPad, offset);
     aad = KMByteBlob.instance(scratchPad, offset, aad);
 
@@ -3981,7 +3983,8 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
             (short) 0,
             ephemeralMacKey,
             KMArray.cast(inputArr).get((short) 3),
-            deviceInfo);
+            deviceInfo,
+            pubKeysToSignMac);
 
     // Create ephemeral ec key.
     seProvider.createAsymmetricKey(
@@ -4100,12 +4103,14 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     tmpVariables[1] =
         KMCose.constructCoseMac0(protectedHeader, KMCoseHeaders.instance(KMArray.instance((short) 0)), payload,
             KMByteBlob.instance(scratchPad, len, hmacLen));
+    tmpVariables[1] = encoder.encode(tmpVariables[1], scratchPad, (short) 0);
+    tmpVariables[1] = KMByteBlob.instance(scratchPad, (short) 0, tmpVariables[1]);
 
     // Encode the COSE_MAC0 object
     tmpVariables[2] = KMArray.instance((short) 3);
     KMArray.cast(tmpVariables[2]).add((short) 0, buildErrorStatus(KMError.OK));
-    KMArray.cast(tmpVariables[2]).add((short) 1, data[KEY_BLOB]);
-    KMArray.cast(tmpVariables[2]).add((short) 2, tmpVariables[1]);
+    KMArray.cast(tmpVariables[2]).add((short) 1, tmpVariables[1]);
+    KMArray.cast(tmpVariables[2]).add((short) 2, data[KEY_BLOB]);
     bufferProp[BUF_START_OFFSET] = repository.allocAvailableMemory();
     // Encode the response
     bufferProp[BUF_LEN_OFFSET] = encoder.encode(tmpVariables[2], (byte[]) bufferRef[0], bufferProp[BUF_START_OFFSET]);
@@ -4640,7 +4645,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
 
   private static void encryptSecret(byte[] scratchPad) {
     // make nonce
-    data[NONCE] = KMByteBlob.instance((short) AES_GCM_NONCE_LENGTH);
+    data[NONCE] = KMByteBlob.instance(AES_GCM_NONCE_LENGTH);
     data[AUTH_TAG] = KMByteBlob.instance(AES_GCM_AUTH_TAG_LENGTH);
     Util.arrayCopyNonAtomic(
         KMByteBlob.cast(data[NONCE]).getBuffer(),
@@ -4734,7 +4739,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     tmpVariables[2] = encoder.encode(tmpVariables[0], repository.getHeap(), tmpVariables[1]);
     if (DERIVE_KEY_INPUT_SIZE > tmpVariables[2]) {
       // Copy KeyCharacteristics in the remaining space of DERIVE_KEY_INPUT_SIZE
-      Util.arrayCopyNonAtomic(repository.getHeap(), (short) (data[AUTH_DATA]),
+      Util.arrayCopyNonAtomic(repository.getHeap(), (data[AUTH_DATA]),
           repository.getHeap(),
           (short) (tmpVariables[1] + tmpVariables[2]),
           (short) (DERIVE_KEY_INPUT_SIZE - tmpVariables[2]));

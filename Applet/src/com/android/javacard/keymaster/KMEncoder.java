@@ -54,7 +54,7 @@ public class KMEncoder {
 
   public KMEncoder() {
     bufferRef = JCSystem.makeTransientObjectArray((short) 1, JCSystem.CLEAR_ON_RESET);
-    scratchBuf = JCSystem.makeTransientShortArray((short) SCRATCH_BUF_SIZE, JCSystem.CLEAR_ON_RESET);
+    scratchBuf = JCSystem.makeTransientShortArray(SCRATCH_BUF_SIZE, JCSystem.CLEAR_ON_RESET);
     stack = JCSystem.makeTransientShortArray(STACK_SIZE, JCSystem.CLEAR_ON_RESET);
     bufferRef[0] = null;
     scratchBuf[START_OFFSET] = (short) 0;
@@ -174,6 +174,7 @@ public class KMEncoder {
           break;
         case KMType.COSE_KEY_TYPE:
         case KMType.COSE_HEADERS_TYPE:
+        case KMType.COSE_CERT_PAYLOAD_TYPE:
           encodeCoseMap(exp);
           break;
         case KMType.KEY_CHAR_TYPE:
@@ -533,7 +534,7 @@ public class KMEncoder {
       writeByte((byte) (UINT_TYPE | val));
     } else {
       writeByte((byte) (UINT_TYPE | UINT8_LENGTH));
-      writeByte((byte) val);
+      writeByte(val);
     }
   }
 

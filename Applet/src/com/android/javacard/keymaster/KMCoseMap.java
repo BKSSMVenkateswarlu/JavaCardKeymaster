@@ -46,6 +46,8 @@ public abstract class KMCoseMap extends KMType {
         return KMCoseHeaders.instance(arrPtr);
       case KMType.COSE_KEY_TYPE:
         return KMCoseKey.instance(arrPtr);
+      case KMType.COSE_CERT_PAYLOAD_TYPE:
+        return KMCoseCertPayload.instance(arrPtr);
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;
@@ -59,6 +61,8 @@ public abstract class KMCoseMap extends KMType {
         return KMCoseHeaders.cast(ptr).getVals();
       case KMType.COSE_KEY_TYPE:
         return KMCoseKey.cast(ptr).getVals();
+      case KMType.COSE_CERT_PAYLOAD_TYPE:
+        return KMCoseCertPayload.cast(ptr).getVals();
       default:
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
         return 0;

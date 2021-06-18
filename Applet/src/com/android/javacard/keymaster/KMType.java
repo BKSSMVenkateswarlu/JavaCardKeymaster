@@ -57,6 +57,7 @@ public abstract class KMType {
   public static final byte COSE_PAIR_TEXT_STR_TAG_TYPE = (byte) 0x80;
   public static final byte SIMPLE_VALUE_TYPE = (byte) 0x90;
   public static final byte COSE_HEADERS_TYPE = (byte) 0xA0;
+  public static final byte COSE_CERT_PAYLOAD_TYPE = (byte) 0xB0;
   // Tag Types
   public static final short INVALID_TAG = 0x0000;
   public static final short ENUM_TAG = 0x1000;
@@ -320,13 +321,14 @@ public abstract class KMType {
   public static final byte KM_SIMPLE_VALUE_OFFSET = KM_TYPE_BASE_OFFSET + 24;
   public static final byte KM_COSE_HEADERS_OFFSET = KM_TYPE_BASE_OFFSET + 25;
   public static final byte KM_COSE_KEY_TXT_STR_VAL_OFFSET = KM_TYPE_BASE_OFFSET + 26;
+  public static final byte KM_COSE_CERT_PAYLOAD_OFFSET = KM_TYPE_BASE_OFFSET + 27;
 
 
 
   protected static KMRepository repository;
   protected static byte[] heap;
   // Instance table
-  public static final byte INSTANCE_TABLE_SIZE = 27;
+  public static final byte INSTANCE_TABLE_SIZE = 28;
   protected static short[] instanceTable;
 
   public static void initialize() {

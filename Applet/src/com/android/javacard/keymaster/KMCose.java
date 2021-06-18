@@ -286,7 +286,8 @@ public class KMCose {
     KMArray.cast(certPayload).add((short) 1, subject);
     KMArray.cast(certPayload).add((short) 2, subPublicKey);
     KMArray.cast(certPayload).add((short) 3, keyUsage);
-    KMCoseMap.canonicalize(certPayload);
+    certPayload = KMCoseCertPayload.instance(certPayload);
+    KMCoseCertPayload.cast(certPayload).canonicalize();
     return certPayload;
   }
 
