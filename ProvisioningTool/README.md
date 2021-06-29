@@ -1,7 +1,5 @@
 # Provisioning tool
-This directory contains two tools. One which constructs the apdus and dumps them to a json file,  
-Other which gets the apuds from the json file and provision them into a secure element simulator.  
-Both the tools can be compiled and executed from a Linux machine.  
+This directory contains two tools. One which constructs the apdus and dumps them to a json file, Other which gets the apuds from the json file and provision them into a secure element simulator. Both the tools can be compiled and executed from a Linux machine.  
 
 #### Build instruction
 The default target generates both the executables. One construct_apdus and the other provision.  
@@ -15,9 +13,7 @@ Before executing the binaries make sure LD_LIBRARY_PATH is set
 export LD_LIBRARY_PATH=./lib:$LD_LIBRARY_PATH  
 
 #### Sample resources for quick testing
-A sample json file is located in this directory with name [sample_json.txt](sample_json.txt)  
-for your reference. Also the required certificates and keys can be found  
-in [test_resources](test_resources) directory.  
+Two sample json files are located in this directory with names sample_json_cf.txt and and sample_json_gf.txt for your reference. Use sample_json_cf.txt for cuttlefish target and use sample_json_gf.txt for goldfish target. Also the required certificates and keys can be found in test_resources directory. Copy the certificates and the key into the emulator/device filesystem in their respective paths mentioned in the sample json file.  
 
 #### Usage for construct_apdus
 <pre>
