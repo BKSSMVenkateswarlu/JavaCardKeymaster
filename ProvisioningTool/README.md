@@ -7,7 +7,7 @@ $ make
 Individual targets can also be selected as shown below  
 $ make construct_apdus  
 $ make provision  
-Make clean will remove all the object files and binaries
+Make clean will remove all the object files and binaries  
 $ make clean
 
 #### Environment setup
