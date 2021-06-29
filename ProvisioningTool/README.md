@@ -37,4 +37,5 @@ Valid options are:
 -v, --km_version version  Version of the keymaster (4.1 for keymaster; 5.0 for keymint)
 -i, --input  jsonFile 	  Input json file 
 -s, --provision_stautus   Prints the current provision status.
+-l, --lock_provision      Locks the provision state.
 </pre>
