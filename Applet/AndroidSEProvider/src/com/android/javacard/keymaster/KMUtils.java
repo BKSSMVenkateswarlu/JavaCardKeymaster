@@ -55,7 +55,7 @@ public class KMUtils {
 
   // --------------------------------------
   public static short convertToDate(short time, byte[] scratchPad,
-      boolean utcFlag) {
+                                    boolean utcFlag) {
 
     short yrsCount = 0;
     short monthCount = 1;
@@ -85,14 +85,14 @@ public class KMUtils {
         (short) 8) < 0) {
       Util.arrayCopyNonAtomic(firstJan2020, (short) 0, scratchPad, (short) 8,
           (short) 8);
-      subtract(scratchPad, (short) 0, (short) 8, (short) 16);
+      subtract(scratchPad, (short) 0, (short) 8, (short) 16, (byte) 8);
       Util.arrayCopyNonAtomic(scratchPad, (short) 16, scratchPad, (short) 0,
           (short) 8);
     } else {
       from2020 = false;
       Util.arrayCopyNonAtomic(firstJan2051, (short) 0, scratchPad, (short) 8,
           (short) 8);
-      subtract(scratchPad, (short) 0, (short) 8, (short) 16);
+      subtract(scratchPad, (short) 0, (short) 8, (short) 16, (byte) 8);
       Util.arrayCopyNonAtomic(scratchPad, (short) 16, scratchPad, (short) 0,
           (short) 8);
     }
@@ -133,7 +133,7 @@ public class KMUtils {
           Util.arrayCopyNonAtomic(yearMsec, (short) 0, scratchPad, (short) 8,
               (short) 8);
         }
-        subtract(scratchPad, (short) 0, (short) 8, (short) 16);
+        subtract(scratchPad, (short) 0, (short) 8, (short) 16, (byte) 8);
         Util.arrayCopyNonAtomic(scratchPad, (short) 16, scratchPad, (short) 0,
             (short) 8);
         if (((short) (i + 1) == leapYrIdx)) {
@@ -183,7 +183,7 @@ public class KMUtils {
 
         if (KMInteger.unsignedByteArrayCompare(scratchPad, (short) 0, scratchPad, (short) 8,
             (short) 8) >= 0) {
-          subtract(scratchPad, (short) 0, (short) 8, (short) 16);
+          subtract(scratchPad, (short) 0, (short) 8, (short) 16, (byte) 8);
           Util.arrayCopyNonAtomic(scratchPad, (short) 16, scratchPad, (short) 0,
               (short) 8);
         } else {
@@ -252,7 +252,7 @@ public class KMUtils {
   }
 
   public static short numberToString(short number, byte[] scratchPad,
-      short offset) {
+                                     short offset) {
     byte zero = 0x30;
     byte len = 2;
     byte digit;
@@ -273,7 +273,7 @@ public class KMUtils {
   // i.e. dividend - quotient*divisor = remainder where remainder < divisor.
   // so this is division by subtraction until remainder remains.
   public static short divide(byte[] buf, short dividend, short divisor,
-      short remainder) {
+                             short remainder) {
     short expCnt = 1;
     short q = 0;
     // first increase divisor so that it becomes greater then dividend.
@@ -285,7 +285,7 @@ public class KMUtils {
     // Copy remainder in the dividend and repeat.
     while (expCnt != 0) {
       if (compare(buf, dividend, divisor) >= 0) {
-        subtract(buf, dividend, divisor, remainder);
+        subtract(buf, dividend, divisor, remainder, (byte) 8);
         copy(buf, remainder, dividend);
         q = (short) (q + expCnt);
       }
@@ -354,9 +354,10 @@ public class KMUtils {
   }
 
   // subtraction by borrowing.
-  public static void subtract(byte[] buf, short op1, short op2, short result) {
+  public static void subtract(byte[] buf, short op1, short op2, short result,
+                              byte sizeBytes) {
     byte borrow = 0;
-    byte index = 7;
+    byte index = (byte) (sizeBytes - 1);
     short r;
     short x;
     short y;
@@ -375,7 +376,7 @@ public class KMUtils {
   }
 
   public static short countTemporalCount(byte[] bufTime, short timeOff,
-      short timeLen, byte[] scratchPad, short offset) {
+                                         short timeLen, byte[] scratchPad, short offset) {
     Util.arrayFillNonAtomic(scratchPad, (short) offset, (short) 24, (byte) 0);
     Util.arrayCopyNonAtomic(
         bufTime,
@@ -407,6 +408,15 @@ public class KMUtils {
       }
     }
     return -1;
+  }
+
+  public static void computeOnesCompliment(byte[] buf, short offset, short len) {
+    short index = offset;
+    // Compute 1s compliment
+    while (index < (short) (len + offset)) {
+      buf[index] = (byte) ~buf[index];
+      index++;
+    }
   }
 
 }

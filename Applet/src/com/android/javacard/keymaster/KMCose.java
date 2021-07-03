@@ -117,7 +117,7 @@ public class KMCose {
   public static final byte[] TEST_SUBJECT_NAME = {0x53, 0x75, 0x62, 0x6A, 0x65, 0x63, 0x74}; // "Subject"
   public static final byte[] KEY_USAGE_SIGN = {0x20}; // Key usage sign
   public static final byte[] MAC_DERIVE_KEY_CTX =
-      {0x4B, 0x65, 0x79, 0x20, 0x74, 0x6F, 0x20, 0x4D, 0x41, 0x43, 0x20, 0x70,0x75, 0x62, 0x6C, 0x69, 0x63,
+      {0x4B, 0x65, 0x79, 0x20, 0x74, 0x6F, 0x20, 0x4D, 0x41, 0x43, 0x20, 0x70, 0x75, 0x62, 0x6C, 0x69, 0x63,
           0x20, 0x6B, 0x65, 0x79, 0x73}; // "Key to MAC public keys"
 
 
@@ -241,8 +241,8 @@ public class KMCose {
   /**
    * Constructs array based on the tag values provided.
    *
-   * @param tags      array of tag values to be constructed.
-   * @param includeTestMode  flag which indicates if TEST_COSE_KEY should be included or not.
+   * @param tags            array of tag values to be constructed.
+   * @param includeTestMode flag which indicates if TEST_COSE_KEY should be included or not.
    * @return instance of KMArray.
    */
   private static short handleCosePairTags(short[] tags, boolean includeTestMode) {
@@ -250,7 +250,7 @@ public class KMCose {
     // var is used to calculate the length of the array.
     short var = 0;
     while (index < tags.length) {
-      if (tags[index + 1] != KMType.INVALID_VALUE) {
+      if (tags[(short) (index + 1)] != KMType.INVALID_VALUE) {
         tags[(short) (index + 2)] =
             buildCosePairTag((byte) tags[index], tags[(short) (index + 1)]);
         var++;
@@ -263,8 +263,8 @@ public class KMCose {
     // var is used to index the array.
     var = 0;
     while (index < tags.length) {
-      if (tags[index + 2] != KMType.INVALID_VALUE) {
-        KMArray.cast(arrPtr).add(var++, tags[index + 2]);
+      if (tags[(short) (index + 2)] != KMType.INVALID_VALUE) {
+        KMArray.cast(arrPtr).add(var++, tags[(short) (index + 2)]);
       }
       index += 3;
     }
@@ -309,7 +309,7 @@ public class KMCose {
         KMCose.COSE_LABEL_COSE_KEY, ephemeralKey, KMType.INVALID_VALUE
     };
     short ptr = handleCosePairTags(coseHeaderTags, false);
-    ptr =  KMCoseHeaders.instance(ptr);
+    ptr = KMCoseHeaders.instance(ptr);
     KMCoseHeaders.cast(ptr).canonicalize();
     return ptr;
   }
@@ -433,14 +433,14 @@ public class KMCose {
    * Constructs the cose key based on input parameters supplied. All the parameters must be instantiated from
    * either KMInteger or KMNInteger or KMByteblob types.
    *
-   * @param keyType  instance of KMInteger/KMNInteger which holds valid COSE key types.
-   * @param keyId    instance of KMByteBlob which holds key identifier value.
-   * @param keyAlg   instance of KMInteger/KMNInteger which holds valid COSE key algorithm.
-   * @param keyOps   instance of KMInteger/KMNInteger which holds valid COSE key operations.
-   * @param curve    instance of KMInteger/KMNInteger which holds valid COSE EC curve.
-   * @param pubX     instance of KMByteBlob which holds EC public key's x value.
-   * @param pubY     instance of KMByteBlob which holds EC public key's y value.
-   * @param priv     instance of KMByteBlob which holds EC private value.
+   * @param keyType        instance of KMInteger/KMNInteger which holds valid COSE key types.
+   * @param keyId          instance of KMByteBlob which holds key identifier value.
+   * @param keyAlg         instance of KMInteger/KMNInteger which holds valid COSE key algorithm.
+   * @param keyOps         instance of KMInteger/KMNInteger which holds valid COSE key operations.
+   * @param curve          instance of KMInteger/KMNInteger which holds valid COSE EC curve.
+   * @param pubX           instance of KMByteBlob which holds EC public key's x value.
+   * @param pubY           instance of KMByteBlob which holds EC public key's y value.
+   * @param priv           instance of KMByteBlob which holds EC private value.
    * @param includeTestKey flag which identifies whether to construct test key or production key.
    * @return instance of the KMCoseKey object.
    */

@@ -28,16 +28,7 @@ public class KMCosePairByteBlobTag extends KMCosePairTagType {
 
   private static KMCosePairByteBlobTag prototype;
 
-  public static final byte[][] keys = {
-      {0, 0, 0, KMCose.COSE_KEY_PUBKEY_X},
-      {0, 0, 0, KMCose.COSE_KEY_PUBKEY_Y},
-      {0, 0, 0, KMCose.COSE_KEY_PRIV_KEY},
-      {0, 0, 0, KMCose.COSE_LABEL_IV},
-      {0, 0, 0, KMCose.COSE_LABEL_KEYID},
-      {0, 0, 0, KMCose.COSE_KEY_KEY_ID},
-      KMCose.SUBJECT_PUBLIC_KEY,
-      KMCose.KEY_USAGE
-  };
+  public static Object[] keys;
 
   private KMCosePairByteBlobTag() {
   }
@@ -100,7 +91,23 @@ public class KMCosePairByteBlobTag extends KMCosePairTagType {
     return Util.getShort(heap, (short) (instanceTable[KM_COSE_KEY_BYTE_BLOB_VAL_OFFSET] + TLV_HEADER_SIZE + 4));
   }
 
+  private static void createKeys() {
+    if (keys == null) {
+      keys = new Object[]{
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_KEY_PUBKEY_X},
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_KEY_PUBKEY_Y},
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_KEY_PRIV_KEY},
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_LABEL_IV},
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_LABEL_KEYID},
+          (Object) new byte[]{(byte) 0, (byte) 0, (byte) 0, KMCose.COSE_KEY_KEY_ID},
+          (Object) KMCose.SUBJECT_PUBLIC_KEY,
+          (Object) KMCose.KEY_USAGE
+      };
+    }
+  }
+
   public static boolean isKeyValueValid(short keyPtr) {
+    createKeys();
     short type = KMType.getType(keyPtr);
     short offset = 0;
     if (type == INTEGER_TYPE) {
@@ -112,7 +119,7 @@ public class KMCosePairByteBlobTag extends KMCosePairTagType {
     }
     short index = 0;
     while (index < (short) keys.length) {
-      if (0 == Util.arrayCompare(keys[index], (short) 0, heap, offset, (short) keys[index].length)) {
+      if (0 == Util.arrayCompare((byte[]) keys[index], (short) 0, heap, offset, (short) ((byte[]) keys[index]).length)) {
         return true;
       }
       index++;

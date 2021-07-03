@@ -29,14 +29,14 @@ import javacard.framework.Util;
  */
 public abstract class KMCoseMap extends KMType {
 
-  public static byte[] scratchpad = JCSystem.makeTransientByteArray((short) 20, JCSystem.CLEAR_ON_RESET);
+  public static byte[] scratchpad;
 
   /**
    * This function creates an instance of either KMCoseHeaders or KMCoseKey based on the type information
    * provided.
    *
    * @param typePtr type information of the underlying KMType.
-   * @param arrPtr instance of KMArray.
+   * @param arrPtr  instance of KMArray.
    * @return instance type of either KMCoseHeaders or KMCoseKey.
    */
   public static short createInstanceFromType(short typePtr, short arrPtr) {
@@ -96,6 +96,11 @@ public abstract class KMCoseMap extends KMType {
     return 0;
   }
 
+  private static void createScratchBuffer() {
+    if (scratchpad == null)
+      scratchpad = JCSystem.makeTransientByteArray((short) 20, JCSystem.CLEAR_ON_RESET);
+  }
+
   // Bubble sort
   protected static void canonicalize(short arr) {
     short index = 0;
@@ -105,6 +110,7 @@ public abstract class KMCoseMap extends KMType {
     short secondKey;
     short firstKeyLen;
     short secondKeyLen;
+    createScratchBuffer();
     boolean flag = false;
     while (index < length) {
       innerIndex = 0;

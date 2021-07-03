@@ -38,25 +38,32 @@ public abstract class KMCosePairTagType extends KMType {
    * can be 4 bytes so each key is represented as 4 bytes. The allowed values are
    * placed next to their corresponding key.
    */
-  public static final Object[] allowedKeyPairs = new Object[]{
-      // Key type
-      new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_TYPE}, new byte[]{KMCose.COSE_KEY_TYPE_EC2,
-      KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
-      // Key Algorithm
-      new byte[]{0, 0, 0, KMCose.COSE_KEY_ALGORITHM},
-      new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
-          KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
-      // Key operations
-      new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_OPS}, new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
-      KMCose.COSE_KEY_OP_ENCRYPT, KMCose.COSE_KEY_OP_DECRYPT},
-      // Key Curve
-      new byte[]{0, 0, 0, KMCose.COSE_KEY_CURVE}, new byte[]{KMCose.COSE_ECCURVE_256},
-      // Header Label Algorithm
-      new byte[]{0, 0, 0, KMCose.COSE_LABEL_ALGORITHM}, new byte[]{KMCose.COSE_ALG_AES_GCM_256,
-      KMCose.COSE_ALG_HMAC_256, KMCose.COSE_ALG_ES256, KMCose.COSE_ALG_ECDH_ES_HKDF_256},
-      // Test Key
-      KMCose.COSE_TEST_KEY, new byte[]{KMSimpleValue.NULL},
-  };
+  public static Object[] allowedKeyPairs;
+
+  private static void createAllowedKeyPairs() {
+    if (allowedKeyPairs == null) {
+      allowedKeyPairs =
+          new Object[]{
+              // Key type
+              (Object) new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_TYPE}, (Object) new byte[]{KMCose.COSE_KEY_TYPE_EC2,
+              KMCose.COSE_KEY_TYPE_SYMMETRIC_KEY},
+              // Key Algorithm
+              (Object) new byte[]{0, 0, 0, KMCose.COSE_KEY_ALGORITHM},
+              (Object) new byte[]{KMCose.COSE_ALG_AES_GCM_256, KMCose.COSE_ALG_HMAC_256,
+                  KMCose.COSE_ALG_ECDH_ES_HKDF_256, KMCose.COSE_ALG_ES256},
+              // Key operations
+              (Object) new byte[]{0, 0, 0, KMCose.COSE_KEY_KEY_OPS}, (Object) new byte[]{KMCose.COSE_KEY_OP_SIGN, KMCose.COSE_KEY_OP_VERIFY,
+              KMCose.COSE_KEY_OP_ENCRYPT, KMCose.COSE_KEY_OP_DECRYPT},
+              // Key Curve
+              (Object) new byte[]{0, 0, 0, KMCose.COSE_KEY_CURVE}, (Object) new byte[]{KMCose.COSE_ECCURVE_256},
+              // Header Label Algorithm
+              (Object) new byte[]{0, 0, 0, KMCose.COSE_LABEL_ALGORITHM}, (Object) new byte[]{KMCose.COSE_ALG_AES_GCM_256,
+              KMCose.COSE_ALG_HMAC_256, KMCose.COSE_ALG_ES256, KMCose.COSE_ALG_ECDH_ES_HKDF_256},
+              // Test Key
+              KMCose.COSE_TEST_KEY, (Object) new byte[]{KMSimpleValue.NULL},
+          };
+    }
+  }
 
 
   /**
@@ -73,6 +80,7 @@ public abstract class KMCosePairTagType extends KMType {
     short valueIdx;
     byte[] values;
     boolean valid = false;
+    createAllowedKeyPairs();
     while (index < allowedKeyPairs.length) {
       valueIdx = 0;
       if (isEqual((byte[]) allowedKeyPairs[index], (short) 0, (short) ((byte[]) allowedKeyPairs[index]).length,
