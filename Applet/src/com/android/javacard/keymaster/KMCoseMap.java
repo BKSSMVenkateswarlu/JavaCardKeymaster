@@ -98,9 +98,40 @@ public abstract class KMCoseMap extends KMType {
 
   private static void createScratchBuffer() {
     if (scratchpad == null)
-      scratchpad = JCSystem.makeTransientByteArray((short) 20, JCSystem.CLEAR_ON_RESET);
+      scratchpad = JCSystem.makeTransientByteArray((short) 120, JCSystem.CLEAR_ON_RESET);
   }
 
+  // Bubble sort.
+  public static void canonicalizeCborMap(short map) {
+    short index = 0;
+    short innerIndex;
+    short length = KMMap.cast(map).length();
+    short firstKey;
+    short secondKey;
+    short firstKeyLen;
+    short secondKeyLen;
+    createScratchBuffer();
+    boolean flag = false;
+    while (index < length) {
+      innerIndex = 0;
+      while (innerIndex < (short) (length - index - 1)) {
+        firstKey = KMMap.cast(map).getKey(innerIndex);
+        firstKeyLen = KMKeymasterApplet.encoder.encode(firstKey, scratchpad, (short) 0);
+        secondKey = KMMap.cast(map).getKey((short) (innerIndex + 1));
+        secondKeyLen = KMKeymasterApplet.encoder.encode(secondKey, scratchpad, firstKeyLen);
+        if ((firstKeyLen > secondKeyLen) ||
+          ((firstKeyLen == secondKeyLen) &&
+            (0 < Util.arrayCompare(scratchpad, (short) 0, scratchpad, firstKeyLen, firstKeyLen)))) {
+          KMMap.cast(map).swap(innerIndex, (short) (innerIndex + 1));
+          flag = true;
+        }
+        innerIndex++;
+      }
+      if (!flag)
+        break;
+      index++;
+    }
+  }
   // Bubble sort
   protected static void canonicalize(short arr) {
     short index = 0;

@@ -201,22 +201,39 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
   protected static short[] tmpVariables;
   protected static short[] data;
   protected static byte provisionStatus = NOT_PROVISIONED;
-  // Device Info
+  // Device Info labels
   public static final byte[] BRAND = {0x62, 0x72, 0x61, 0x6E, 0x64};
   public static final byte[] MANUFACTURER = {0x6D, 0x61, 0x6E, 0x75, 0x66, 0x61, 0x63, 0x74, 0x75, 0x72, 0x65, 0x72};
-  public static final byte[] PRODUCT = {0x70, 0x72, 0x6F, 0x64, 0x75, 0x63, 74};
+  public static final byte[] PRODUCT = {0x70, 0x72, 0x6F, 0x64, 0x75, 0x63, 0x74};
   public static final byte[] MODEL = {0x6D, 0x6F, 0x64, 0x65, 0x6C};
-  public static final byte[]  BOARD = { 0x62, 0x6F, 0x61, 0x72, 0x64 };
+  public static final byte[] BOARD = {0x62, 0x6F, 0x61, 0x72, 0x64};
   public static final byte[] VB_STATE = {0x76, 0x62, 0x5F, 0x73, 0x74, 0x61, 0x74, 0x65};
   public static final byte[] BOOTLOADER_STATE =
-      {0x62, 0x6F, 0x6F, 0x74, 0x6C, 0x6F, 0x61, 0x64, 0x65, 0x72, 0x5F, 0x73, 0x74, 0x61, 0x74, 0x65};
+    {0x62, 0x6F, 0x6F, 0x74, 0x6C, 0x6F, 0x61, 0x64, 0x65, 0x72, 0x5F, 0x73, 0x74, 0x61, 0x74, 0x65};
+  public static final byte[] VB_META_DIGEST =
+    {0X76, 0X62, 0X6D, 0X65, 0X74, 0X61, 0X5F, 0X64, 0X69, 0X67, 0X65, 0X73, 0X74};
   public static final byte[] OS_VERSION = {0x6F, 0x73, 0x5F, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E};
   public static final byte[] SYSTEM_PATCH_LEVEL =
-      {0x73, 0x79, 0x73, 0x74, 0x65, 0x6D, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
+    {0x73, 0x79, 0x73, 0x74, 0x65, 0x6D, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
   public static final byte[] BOOT_PATCH_LEVEL =
-      {0x62, 0x6F, 0x6F, 0x74, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
+    {0x62, 0x6F, 0x6F, 0x74, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
   public static final byte[] VENDOR_PATCH_LEVEL =
-      {0x76, 0x65, 0x6E, 0x64, 0x6F, 0x72, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
+    {0x76, 0x65, 0x6E, 0x64, 0x6F, 0x72, 0x5F, 0x70, 0x61, 0x74, 0x63, 0x68, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
+  public static final byte[] DEVICE_INFO_VERSION =
+    {0x76, 0x65, 0x72, 0x73, 0x69, 0x6F, 0x6E};
+  public static final byte[] SECURITY_LEVEL =
+    {0x73, 0x65, 0x63, 0x75, 0x72, 0x69, 0x74, 0x79, 0x5F, 0x6C, 0x65, 0x76, 0x65, 0x6C};
+  // Verified boot state values
+  public static final byte[] VB_STATE_GREEN = {0x67, 0x72, 0x65, 0x65, 0x6E};
+  public static final byte[] VB_STATE_YELLOW = {0x79, 0x65, 0x6C, 0x6C, 0x6F, 0x77};
+  public static final byte[] VB_STATE_ORANGE = {0x6F, 0x72, 0x61, 0x6E, 0x67, 0x65};
+  public static final byte[] VB_STATE_RED = {0x72, 0x65, 0x64};
+  // Boot loader state values
+  public static final byte[] UNLOCKED = {0x75, 0x6E, 0x6C, 0x6F, 0x63, 0x6B, 0x65, 0x64};
+  public static final byte[] LOCKED = {0x6C, 0x6F, 0x63, 0x6B, 0x65, 0x64};
+  // Device info CDDL schema version
+  public static final byte DI_SCHEMA_VERSION = 1;
+  public static final byte[] DI_SECURITY_LEVEL = {0x73, 0x74, 0x72, 0x6F, 0x6E, 0x67, 0x62, 0x6F, 0x78};
   // Hard-coded set of acceptable public keys that can act as roots of EEK chains.
   public static Object[] authorizedEekRoots;
 
@@ -243,7 +260,7 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
       authorizedEekRoots =
           new Object[]
               {
-                  (Object) new byte[]{
+                  new byte[]{
                       0x5c, (byte) 0xea, 0x4b, (byte) 0xd2, 0x31, 0x27, 0x15, 0x5e, 0x62, (byte) 0x94, 0x70,
                       0x53, (byte) 0x94, 0x43, 0x0f, (byte) 0x9a, (byte) 0x89, (byte) 0xd5, (byte) 0xc5, 0x0f,
                       (byte) 0x82, (byte) 0x9b, (byte) 0xcd, 0x10, (byte) 0xe0, 0x79, (byte) 0xef, (byte) 0xf3,
@@ -3687,56 +3704,203 @@ public class KMKeymasterApplet extends Applet implements AppletEvent, ExtendedLe
     return KMByteBlob.instance(scratchPad, (short) (offset + len), ptr);
   }
 
+  private static boolean isEmpty(byte[] buf, short offset, short len) {
+    boolean empty = true;
+    short index = 0;
+    while (index < len) {
+      if (buf[(short) (index + offset) ] != 0) {
+        empty = false;
+        break;
+      }
+      index++;
+    }
+    return empty;
+  }
+
+  private static short getBootloaderState() {
+    boolean deviceLock = repository.getBootLoaderLock();
+    short bootloaderState;
+    if (deviceLock) {
+      bootloaderState = KMTextString.instance(LOCKED, (short) 0, (short) LOCKED.length);
+    } else {
+      bootloaderState = KMTextString.instance(UNLOCKED, (short) 0, (short) UNLOCKED.length);
+    }
+    return bootloaderState;
+  }
+
+  private static short getVbState() {
+    byte state = repository.getBootState();
+    short vbState = KMType.INVALID_VALUE;
+    if (state == KMType.VERIFIED_BOOT) {
+      vbState = KMTextString.instance(VB_STATE_GREEN, (short) 0, (short) VB_STATE_GREEN.length);
+    } else if (state == KMType.SELF_SIGNED_BOOT) {
+      vbState = KMTextString.instance(VB_STATE_YELLOW, (short) 0, (short) VB_STATE_YELLOW.length);
+    } else if (state == KMType.UNVERIFIED_BOOT) {
+      vbState = KMTextString.instance(VB_STATE_ORANGE, (short) 0, (short) VB_STATE_ORANGE.length);
+    } else if (state == KMType.FAILED_BOOT) {
+      vbState = KMTextString.instance(VB_STATE_RED, (short) 0, (short) VB_STATE_RED.length);
+    }
+    return vbState;
+  }
+
+  private static short getAttestationId(byte attestId) {
+    short value = repository.getAttId(attestId);
+    if (value != 0 &&
+      !isEmpty(KMByteBlob.cast(value).getBuffer(),
+        KMByteBlob.cast(value).getStartOff(),
+        KMByteBlob.cast(value).length())) {
+      return KMByteBlob.cast(value).convertAsTextString();
+    }
+    return KMType.INVALID_VALUE;
+  }
+
+  /**
+   * DeviceInfo is a CBOR Map structure described by the following CDDL.
+   *
+   *     DeviceInfo = {
+   *         ? "brand" : tstr,
+   *         ? "manufacturer" : tstr,
+   *         ? "product" : tstr,
+   *         ? "model" : tstr,
+   *         ? "board" : tstr,
+   *         ? "vb_state" : "green" / "yellow" / "orange",    // Taken from the AVB values
+   *         ? "bootloader_state" : "locked" / "unlocked",    // Taken from the AVB values
+   *         ? "vbmeta_digest": bstr,                         // Taken from the AVB values
+   *         ? "os_version" : tstr,                    // Same as android.os.Build.VERSION.release
+   *         ? "system_patch_level" : uint,                   // YYYYMMDD
+   *         ? "boot_patch_level" : uint,                     // YYYYMMDD
+   *         ? "vendor_patch_level" : uint,                   // YYYYMMDD
+   *         "version" : 1,                      // The CDDL schema version.
+   *         "security_level" : "tee" / "strongbox"
+   *     }
+   */
   private static short createDeviceInfo() {
-    // TODO
-//    short brand = repository.getAttId(KMRepository.ATT_ID_BRAND);
-//    short manufacturer = repository.getAttId(KMRepository.ATT_ID_MANUFACTURER);
-//    short product = repository.getAttId(KMRepository.ATT_ID_PRODUCT);
-//    short model = repository.getAttId(KMRepository.ATT_ID_MODEL);
-//    // TODO BOARD.
-//    short vendorPatchLevel = repository.getVendorPatchLevel();
-//    short systemPatchLevel = repository.getOsPatch();
-//    short bootPatchLevel = repository.getBootPatchLevel();
-//    // TODO OS_VERSION should be a TSTR as per DeviceInfo: Same as android.os.Build.VERSION.release,
-//    // but here it is uint.
-//    short osVersion = repository.getOsVersion();
-//    // TODO Boot state has verified, selfSigned, unVerified, Failed, but DeviceInfo expects
-//    // Green, Yellow and Orange values.
-//    byte vbState = repository.getBootState();
-//    boolean deviceLock = repository.getDeviceLock();
-//    // TODO vb_state, bootloader_state, os_version, system_patch_level
-//    // TODO vendor_patch_level, boot_patch_level
-//    short index = 0;
-//    short map = KMMap.instance((short) 8);
-//    KMMap.cast(map).add(index++, KMTextString.instance(BRAND, (short) 0, (short) BRAND.length),
-//        KMByteBlob.cast(brand).convertAsTextString());
-//    KMMap.cast(map).add(index++, KMTextString.instance(MANUFACTURER, (short) 0, (short) MANUFACTURER.length),
-//        KMByteBlob.cast(manufacturer).convertAsTextString());
-//    KMMap.cast(map).add(index++, KMTextString.instance(PRODUCT, (short) 0, (short) PRODUCT.length),
-//        KMByteBlob.cast(product).convertAsTextString());
-//    KMMap.cast(map).add(index++, KMTextString.instance(MODEL, (short) 0, (short) MODEL.length),
-//        KMByteBlob.cast(model).convertAsTextString());
-//    KMMap.cast(map).add(index++,
-//        KMTextString.instance(VENDOR_PATCH_LEVEL, (short) 0, (short) VENDOR_PATCH_LEVEL.length),
-//        vendorPatchLevel);
-//    KMMap.cast(map).add(index++,
-//        KMTextString.instance(SYSTEM_PATCH_LEVEL, (short) 0, (short) SYSTEM_PATCH_LEVEL.length),
-//        systemPatchLevel);
-//    KMMap.cast(map).add(index++,
-//        KMTextString.instance(BOOT_PATCH_LEVEL, (short) 0, (short) BOOT_PATCH_LEVEL.length),
-//        bootPatchLevel);
-//    KMMap.cast(map).add(index,
-//        KMTextString.instance(OS_VERSION, (short) 0, (short) OS_VERSION.length),
-//        osVersion);
-//    // TODO Add two below
-//    KMMap.cast(map).add(index++,
-//        KMTextString.instance(VB_STATE, (short) 0, (short) VB_STATE.length),
-//        KMEnum.instance());
-//    KMMap.cast(map).add(index++,
-//        KMTextString.instance(BOOTLOADER_STATE, (short) 0, (short) BOOTLOADER_STATE.length),
-//        KMEnum.instance());
-//    return map;
-    return KMMap.instance((short) 0);
+    short length = 0;
+    // Device Info Key Value pairs.
+    short[] deviceIds = {
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+      KMType.INVALID_VALUE, KMType.INVALID_VALUE,
+    };
+    short value;
+    short index = 0;
+    // brand.
+    if (KMType.INVALID_VALUE != (value = getAttestationId(KMRepository.ATT_ID_BRAND))) {
+      deviceIds[index++] = KMTextString.instance(BRAND, (short) 0, (short) BRAND.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // manufacturer
+    if (KMType.INVALID_VALUE != (value = getAttestationId(KMRepository.ATT_ID_MANUFACTURER))) {
+      deviceIds[index++] = KMTextString.instance(MANUFACTURER, (short) 0, (short) MANUFACTURER.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // product
+    if (KMType.INVALID_VALUE != (value = getAttestationId(KMRepository.ATT_ID_PRODUCT))) {
+      deviceIds[index++] = KMTextString.instance(PRODUCT, (short) 0, (short) PRODUCT.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // model
+    if (KMType.INVALID_VALUE != (value = getAttestationId(KMRepository.ATT_ID_MODEL))) {
+      deviceIds[index++] = KMTextString.instance(MODEL, (short) 0, (short) MODEL.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // vb_state
+    if (KMType.INVALID_VALUE != (value = getVbState())) {
+      deviceIds[index++] = KMTextString.instance(VB_STATE, (short) 0, (short) VB_STATE.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // bootloader_state
+    if (KMType.INVALID_VALUE != (value = getBootloaderState())) {
+      deviceIds[index++] =
+        KMTextString.instance(BOOTLOADER_STATE, (short) 0, (short) BOOTLOADER_STATE.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // vbmeta_digest
+    if (0 != (value = repository.getVerifiedBootHash())) {
+      deviceIds[index++] =
+        KMTextString.instance(VB_META_DIGEST, (short) 0, (short) VB_META_DIGEST.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // os_version
+    value = repository.getOsVersion();
+    if (!isEmpty(KMInteger.cast(value).getBuffer(), KMInteger.cast(value).getStartOff(),
+      KMInteger.cast(value).length())) {
+      // Convert Integer to Text String.
+      value =
+        KMTextString.instance(KMInteger.cast(value).getBuffer(), KMInteger.cast(value).getStartOff(),
+          KMInteger.cast(value).length());
+      deviceIds[index++] = KMTextString.instance(OS_VERSION, (short) 0, (short) OS_VERSION.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // system_patch_level.
+    value = repository.getOsPatch();
+    if (!isEmpty(KMInteger.cast(value).getBuffer(), KMInteger.cast(value).getStartOff(),
+      KMInteger.cast(value).length())) {
+      deviceIds[index++] = value;
+        KMTextString.instance(SYSTEM_PATCH_LEVEL, (short) 0, (short) SYSTEM_PATCH_LEVEL.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // boot_patch_level
+    value = repository.getBootPatchLevel();
+    if (!isEmpty(KMInteger.cast(value).getBuffer(), KMInteger.cast(value).getStartOff(),
+      KMInteger.cast(value).length())) {
+      deviceIds[index++] =
+        KMTextString.instance(BOOT_PATCH_LEVEL, (short) 0, (short) BOOT_PATCH_LEVEL.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // vendor_patch_level
+    value = repository.getVendorPatchLevel();
+    if (!isEmpty(KMInteger.cast(value).getBuffer(), KMInteger.cast(value).getStartOff(),
+      KMInteger.cast(value).length())) {
+      deviceIds[index++] =
+        KMTextString.instance(VENDOR_PATCH_LEVEL, (short) 0, (short) VENDOR_PATCH_LEVEL.length);
+      deviceIds[index++] = value;
+      length++;
+    }
+    // Version
+    deviceIds[index++] =
+      KMTextString.instance(DEVICE_INFO_VERSION, (short) 0, (short) DEVICE_INFO_VERSION.length);
+    deviceIds[index++] = KMInteger.uint_8(DI_SCHEMA_VERSION);
+    length++;
+    // Security Level
+    deviceIds[index++] =
+      KMTextString.instance(SECURITY_LEVEL, (short) 0, (short) SECURITY_LEVEL.length);
+    deviceIds[index] =
+      KMTextString.instance(DI_SECURITY_LEVEL, (short) 0, (short) DI_SECURITY_LEVEL.length);
+    length++;
+    // Create device info map.
+    short map = KMMap.instance(length);
+    short mapIndex = 0;
+    index = 0;
+    while (index < (short) deviceIds.length) {
+      if (deviceIds[index] != KMType.INVALID_VALUE) {
+        KMMap.cast(map).add(mapIndex++, deviceIds[index], deviceIds[(short) (index+1)]);
+      }
+      index += 2;
+    }
+    KMMap.cast(map).canonicalize();
+    return map;
   }
 
   private static short createSignedMac(KMDeviceUniqueKey deviceUniqueKey, byte[] scratchPad, short offset,
